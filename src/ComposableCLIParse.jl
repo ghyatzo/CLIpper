@@ -58,23 +58,46 @@ function map_err(f, ::Type{E}, x::Result{O})::Result{O, E} where {O, E}
 	return Result{O, E}(data isa Ok ? Ok(data.x) : Err(f(data.x)))
 end
 
-export option, flag, argparse, stringval
+export option, flag, argparse, stringval, object
 
 
 include("parser.jl")
 
-# struct _ValueParser{T}
-# 	metavar::String
-# 	# ... custom vars
-# end
-
-# function parse end # String -> Result{T, String}
-# function format end # T -> String
-
 include("valueparsers.jl")
-
-
 include("primitives.jl")
+include("constructors.jl")
+
+@wrapped struct Parser{T, S}
+	union::Union{
+		ArgFlag{T, S},
+		ArgOption{T, S},
+		Object{T, S}
+	}
+end
+
+Base.getproperty(p::Parser, f::Symbol) = @unionsplit Base.getproperty(p, f)
+
+tval(::Type{Parser{T, S}}) where {T, S} = T
+tstate(::Type{Parser{T,S}}) where {T,S} = S
+
+# primitives
+option(names::Vector{String}, valparser::ValueParser{T}; kw...) where {T} =
+	Parser{T, Result{T, String}}(ArgOption(names, valparser; kw...))
+
+flag(names::Vector{String}; kw...) =
+	Parser{Bool, Result{Bool, String}}(ArgFlag(names; kw...))
+
+
+# constructors
+object(obj::NamedTuple) = let
+	labels, parsers, obj_t, obj_tstates, priority, initialState = _extract_parser_info(obj)
+	Parser{obj_t, obj_tstates}(Object{obj_t, obj_tstates}(priority, initialState, parsers, ""))
+end
+object(objlabel, obj::NamedTuple) = let
+	labels, parsers, obj_t, obj_tstates, priority, initialState = _extract_parser_info(obj)
+	Parser{obj_t, obj_tstates}(Object{obj_t, obj_tstates}(priority, initialState, parsers, objlabel))
+end
+
 
 
 
@@ -82,28 +105,28 @@ include("primitives.jl")
 # entry point
 function argparse(parser::Parser{T, S}, args::Vector{String})::Result{T, String} where {T, S}
 
-	state = ArgState(args, parser.initialState)
+	ctx = Context(args, parser.initialState)
 
 	while true
-		mayberesult::ParseResult{S, String} = parser.parse(state)
+		mayberesult::ParseResult{S, String} = @unionsplit parse(parser, ctx)
 
 		is_error(mayberesult) && return Err(unwrap_error(mayberesult).error)
 		result = ErrorTypes.unwrap(mayberesult)
 
-		previous_buffer = state.buffer
-		state = result.next
+		previous_buffer = ctx.buffer
+		ctx = result.next
 
-		if ( length(state.buffer) > 0 &&
-			 length(state.buffer) == length(previous_buffer) &&
-			 state.buffer[0] === previous_buffer[0])
+		if ( length(ctx.buffer) > 0 &&
+			 length(ctx.buffer) == length(previous_buffer) &&
+			 ctx.buffer[0] === previous_buffer[0])
 
-			return Err("Unexpected option or argument: $(state.buffer[0]).")
+			return Err("Unexpected option or argument: $(ctx.buffer[0]).")
 		end
 
-		length(state.buffer) > 0 || break
+		length(ctx.buffer) > 0 || break
 	end
 
-	endResult = parser.complete(state)
+	endResult = @unionsplit complete(parser, ctx.state)
 end
 
 macro comment(_...) end
@@ -113,6 +136,11 @@ macro comment(_...) end
 
 	opt = option(["--host"], stringval(;metavar = "HOST"))
 	flg = flag(["--verbose"])
+
+	obj = object("test", (
+		option = opt,
+		flag = flg
+	))
 
 	@show argparse(opt, args)
 	@show argparse(flg, args)

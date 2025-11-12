@@ -1,5 +1,12 @@
 
 # Value Parser interface
+# struct _ValueParser{T}
+# 	metavar::String
+# 	# ... custom vars
+# end
+
+# function parse end # String -> Result{T, String}
+# function format end # T -> String
 
 
 @kwdef struct StringVal
@@ -40,8 +47,6 @@ end
 		Nothing
 	}
 end
-
-hasvalue(v::ValueParser) = WrappedUnions.unwrap(v) !== nothing
 
 parse(x::ValueParser, input::Base.String)::Result = @unionsplit parse(x, input)
 

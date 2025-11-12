@@ -1,185 +1,191 @@
 # the primitives are just functions that return a parser
 
 # single boolean flags: -q --long
-function flag(names::Vector{String}; description="")
-	S = Result{Bool, String}
-	init::S = Ok(false)
+struct ArgFlag{T, S}
+	priority::Integer
+	initialState::S
+	#
+	names::Vector{String}
+	description::String
+end
 
-	parse = function _p(st::ArgState)::ParseResult{S, String}
-		if st.optionsTerminated
-			return Err(ParseFailure(0, "No more options to be parsed."))
-		elseif length(st.buffer) < 1
-			return Err(ParseFailure(0, "Expected flag got end of input."))
+ArgFlag(names::Vector{String}; description = "" ) =
+	ArgFlag{Bool, Result{Bool, String}}(9, Err("Missing Flag(s) $(names)."), names, description)
+
+function parse(p::ArgFlag{T, S}, ctx::Context)::ParseResult{S, String} where {T, S}
+	if ctx.optionsTerminated
+		return Err(ParseFailure(0, "No more options to be parsed."))
+	elseif length(ctx.buffer) < 1
+		return Err(ParseFailure(0, "Expected flag got end of input."))
+	end
+
+	# When the input contains `--` is a signal to stop parsing options
+	if (ctx.buffer[1] === "--")
+		next = Context(ctx.buffer[2:end], Nothing, true)
+		return Ok(ParseSuccess(ctx.buffer[1:1], next))
+	end
+
+	if ctx.buffer[1] in p.names
+
+		if !is_error(ctx.state) && ErrorTypes.unwrap(ctx.state)
+			return Err(ParseFailure(1, "$(ctx.buffer[1]) cannot be used multiple times"))
 		end
 
-		# When the input contains `--` is a signal to stop parsing options
-		if (st.buffer[1] === "--")
-			next = ArgState(st.buffer[2:end], Nothing, true)
-			return Ok(ParseSuccess(st.buffer[1:1], next))
-		end
+		return Ok(ParseSuccess(
+			ctx.buffer[1:1],
 
-		if st.buffer[1] in names
-
-			if !is_error(st.state) && ErrorTypes.unwrap(st.state)
-				return Err(ParseFailure(1, "$(st.buffer[1]) cannot be used multiple times"))
-			end
-
-			return Ok(ParseSuccess(
-				st.buffer[1:1],
-
-				ArgState(
-					st.buffer[2:end],
-					Result{Bool, String}(Ok(true)),
-					st.optionsTerminated
-				)
-			))
-		end
-
-		# When the input contains bundled options: -abc
-
-		short_options = filter(names) do name
-			match(r"^-[^-]$", name) !== nothing
-		end
-
-		for short_opt in short_options
-			startswith(st.buffer[1], short_opt) || continue
-
-			if !is_error(st.state) && ErrorTypes.unwrap(st.state)
-				return Err(ParseFailure(1, "Flag $(short_opt) cannot be used multiple times"))
-			end
-
-			return Ok(
-				ParseSuccess(
-					st.buffer[1][1:2],
-
-					ArgState(
-						["-$(st.buffer[1][3:end])", st.buffer[2:end]...],
-						Result{Bool,String}(Ok(true)),
-						st.optionsTerminated
-					)
-				)
+			Context(
+				ctx.buffer[2:end],
+				Result{Bool, String}(Ok(true)),
+				ctx.optionsTerminated
 			)
-		end
-
-		return Err(ParseFailure(
-			0, "No Matched Flag for $(st.buffer[1])"
 		))
 	end
 
-	complete = function _c(st::ArgState)::S
-		if isnothing(st.state)
-			return Err("Missing Flag $(names).")
-		end
+	# When the input contains bundled options: -abc
 
-		!is_error(st.state) && return st.state
-		error = unwrap_error(st.state)
-		return Err("$(names): $error")
+	short_options = filter(p.names) do name
+		match(r"^-[^-]$", name) !== nothing
 	end
 
+	for short_opt in short_options
+		startswith(ctx.buffer[1], short_opt) || continue
 
-	Parser{Bool}(9, init, parse, complete)
+		if !is_error(ctx.state) && ErrorTypes.unwrap(ctx.state)
+			return Err(ParseFailure(1, "Flag $(short_opt) cannot be used multiple times"))
+		end
+
+		return Ok(
+			ParseSuccess(
+				ctx.buffer[1][1:2],
+
+				Context(
+					["-$(ctx.buffer[1][3:end])", ctx.buffer[2:end]...],
+					Result{Bool,String}(Ok(true)),
+					ctx.optionsTerminated
+				)
+			)
+		)
+	end
+
+	return Err(ParseFailure(
+		0, "No Matched Flag for $(ctx.buffer[1])"
+	))
 end
 
-function option(names::Vector{String}, valueparser::ValueParser{T}; description="") where {T}
-	S = Result{T, String}
-	init::S = Err("Missing Option(s) $(names).")
+function complete(p::ArgFlag{T}, st::Nothing)::Result{T, String} where {T}
+	Err("Missing Option(s) $(p.names).")
+end
+function complete(p::ArgFlag, st::S)::S where {S}
+	!is_error(st) && return st
+	error = unwrap_error(st)
+	return Err("$(p.names): $error")
+end
 
-	parse = function _p(st::ArgState)::ParseResult{S, String}
 
-		if st.optionsTerminated
-			return Err(ParseFailure(0, "No more options to be parsed."))
-		elseif length(st.buffer) < 1
-			return Err(ParseFailure(0, "Expected option got end of input."))
+# options with values: -o 123 / --option value
+struct ArgOption{T, S}
+	priority::Integer
+	initialState::S
+	#
+	valparser::ValueParser{T}
+	#
+	names::Vector{String}
+	description::String
+end
+
+ArgOption(names::Vector{String}, valparser::ValueParser{T}; description = "") where {T} =
+	ArgOption{T, Result{T, String}}(10, Err("Missing Option(s) $(names)."), valparser, names, description)
+
+function parse(p::ArgOption{T, S}, ctx::Context)::ParseResult{S, String} where {T, S}
+	if ctx.optionsTerminated
+		return Err(ParseFailure(0, "No more options to be parsed."))
+	elseif length(ctx.buffer) < 1
+		return Err(ParseFailure(0, "Expected option got end of input."))
+	end
+
+	# When the input contains `--` is a signal to stop parsing options
+	if (ctx.buffer[1] === "--")
+		next = Context(ctx.buffer[2:end], Nothing, true)
+		return Ok(ParseSuccess(ctx.buffer[1:1], next))
+	end
+
+	# when options are of the form `--option value` or `/O value`
+	if ctx.buffer[1] in p.names
+
+		if !is_error(ctx.state) && ErrorTypes.unwrap(ctx.state)
+			return Err(ParseFailure(1, "$(ctx.buffer[1]) cannot be used multiple times"))
 		end
 
-		# When the input contains `--` is a signal to stop parsing options
-		if (st.buffer[1] === "--")
-			next = ArgState(st.buffer[2:end], Nothing, true)
-			return Ok(ParseSuccess(st.buffer[1:1], next))
-		end
-
-		# when options are of the form `--option value` or `/O value`
-		if st.buffer[1] in names
-
-			if !is_error(st.state) && unwrap(st.state)
-				return Err(ParseFailure(1, "$(st.buffer[1]) cannot be used multiple times"))
-			end
-
-			if length(st.buffer) < 2
-				return Err(
-					ParseFailure(
-						1, "Option $(st.buffer[1]) requires a value, but got no value."
-					)
-				)
-			end
-
-			result = @unionsplit valueparser(st.buffer[2])
-
-			return Ok(
-				ParseSuccess(
-					st.buffer[1:2],
-
-					ArgState(
-						st.buffer[3:end],
-						result,
-						st.optionsTerminated
-					)
+		if length(ctx.buffer) < 2
+			return Err(
+				ParseFailure(
+					1, "Option $(ctx.buffer[1]) requires a value, but got no value."
 				)
 			)
 		end
 
-		# when options are of the form `--option=value` or `/O:value`
-		prefixes = filter(names) do name
-			startswith(name, "--") || startswith(name, "/")
-		end
-		map!(prefixes) do name
-			startswith(name, "/") ? "$name:" : "$name="
-		end
-		for prefix in prefixes
-			startswith(st.buffer[1], prefix) || continue
+		result = @unionsplit p.valparser(ctx.buffer[2])
 
-			if !is_error(st.state) && ErrorTypes.unwrap(st.state)
-				return Err(ParseFailure(1, "$(prefix[1:end-1]) cannot be used multiple times"))
-			end
+		return Ok(
+			ParseSuccess(
+				ctx.buffer[1:2],
 
-			value = st.buffer[1][length(prefix)+1:end]
-			result = @unionsplit valueparser(value)
-
-			return Ok(
-				ParseSuccess(
-					st.buffer[1:2],
-
-					ArgState(
-						st.buffer[3:end],
-						result,
-						st.optionsTerminated
-					)
+				Context(
+					ctx.buffer[3:end],
+					result,
+					ctx.optionsTerminated
 				)
 			)
-
-		end
-
-		return Err(ParseFailure(
-			0, "No Matched option for $(st.buffer[1])"
-		))
+		)
 	end
 
-	complete = function _c(st::ArgState)::S
-		if isnothing(st.state)
-			return Err("Missing Option(s) $(names).")
+	# when options are of the form `--option=value` or `/O:value`
+	prefixes = filter(p.names) do name
+		startswith(name, "--") || startswith(name, "/")
+	end
+	map!(prefixes) do name
+		startswith(name, "/") ? "$name:" : "$name="
+	end
+	for prefix in prefixes
+		startswith(ctx.buffer[1], prefix) || continue
+
+		if !is_error(ctx.state) && ErrorTypes.unwrap(ctx.state)
+			return Err(ParseFailure(1, "$(prefix[1:end-1]) cannot be used multiple times"))
 		end
 
-		!is_error(st.state) && return st.state
-		error = unwrap_error(st.state)
-		return Err("$(names): $error")
+		value = ctx.buffer[1][length(prefix)+1:end]
+		result = @unionsplit p.valparser(value)
+
+		return Ok(
+			ParseSuccess(
+				ctx.buffer[1:2],
+
+				Context(
+					ctx.buffer[3:end],
+					result,
+					ctx.optionsTerminated
+				)
+			)
+		)
+
 	end
 
-
-	Parser{T}(10, init, parse, complete)
+	return Err(ParseFailure(
+		0, "No Matched option for $(ctx.buffer[1])"
+	))
 end
 
 
+function complete(p::ArgOption{T, S}, st::Nothing)::Result{T, String} where {T, S}
+	Err("Missing Option(s) $(p.names).")
+end
 
+function complete(p::ArgOption, st::S)::S where {S}
+	!is_error(st) && return st
+	error = unwrap_error(st)
+	return Err("$(p.names): $error")
+end
 
 
 # struct ArgOption{T, TState}
@@ -187,7 +193,7 @@ end
 # 	initialState::TState
 # 	valueparser::ValueParser{T}
 
-# 	names::Vector{String}
+# 	p.names::Vector{String}
 
 # 	# options
 # 	description::String
