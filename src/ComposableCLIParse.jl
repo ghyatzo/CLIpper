@@ -126,6 +126,12 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
 	while true
 		mayberesult::ParseResult{S, String} = @unionsplit parse(pp, ctx)
 		@info mayberesult
+		#=
+			There is currently an issue. We need a mechanism to allow bypassing this check
+			To allow for potential "fixable" errors (think optional) to pass through to the
+			complete function. At first we simply updated the state, which works for single state
+			parsers, but fails completely for multistate ones
+		=#
 		if is_error(mayberesult)
 			return Err(unwrap_error(mayberesult).error)
 			# ctx = @set ctx.state = newstate
