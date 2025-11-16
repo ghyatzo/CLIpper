@@ -1,5 +1,6 @@
 using Test
 using ComposableCLIParse
+using ComposableCLIParse: Context, parse, priority, complete, tstate, tval
 using ErrorTypes
 using WrappedUnions: @unionsplit
 using JET
@@ -43,12 +44,12 @@ end
             parser = constant(42)
 
             @test priority(parser) == 0
-            @test parser.initialState == Val(42)
+            @test unwrap(parser.initialState) == Val(42)
         end
 
         @testset "should parse without consuming any input" begin
             parser = constant(:hello)
-            context = Context(["--option", "value"], Val(:hello))
+            context = Context(["--option", "value"], Result{Val{:hello}, String}(Ok(Val(:hello))))
 
             result = @unionsplit parse(parser, context)
             @test is_ok_and(result) do succ
@@ -59,7 +60,7 @@ end
         end
         @testset "should complete successfully with a constant value" begin
             parser = constant(69)
-            result = complete(parser, Val(69))
+            result = complete(parser, Result{Val{69}, String}(Ok(Val(69))))
 
             @test is_ok_and(result) do succ
                 @test succ == 69
@@ -72,10 +73,10 @@ end
             boolconst = constant(true)
             namedtupleconst = constant((key = :value,))
 
-            @test (@? complete(stringconst, Val(:hello))) == :hello
-            @test (@? complete(intconst, Val(123))) == 123
-            @test (@? complete(boolconst, Val(true))) == true
-            @test (@? complete(namedtupleconst, Val((key = :hello,)))) == (key = :hello,)
+            @test (@? complete(stringconst,     Result{Val{:hello}, String}(Ok(Val(:hello))))) == :hello
+            @test (@? complete(intconst,        Result{Val{123}, String}(Ok(Val(123))))) == 123
+            @test (@? complete(boolconst,       Result{Val{true}, String}(Ok(Val(true))))) == true
+            @test (@? complete(namedtupleconst, Result{Val{(key = :value,)}, String}(Ok(Val((key = :value,)))))) == (key = :value,)
         end
     end
 
@@ -318,6 +319,195 @@ end
 
             _p(par, ctx) = @unionsplit parse(par, ctx)
             @test_opt _p(parser, context)
+        end
+    end
+end
+
+@testset "Modifiers" begin
+   @testset "Optional parser" begin
+
+        @testset "should create a parser with same priority as wrapped parser" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            @test priority(optionalParser) == priority(baseParser)
+            # @test optionalParser.initialState === nothing
+            @test optionalParser.initialState === none(tstate(baseParser))
+        end
+
+        @testset "should return wrapped parser value when it succeeds" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            context = Context(["-v"], optionalParser.initialState)
+            parseResult = parse(optionalParser, context)
+
+            @test !is_error(parseResult)
+            ps = unwrap(parseResult)
+
+            # Completing the optional with the state produced by parse
+            completeResult = complete(optionalParser, ps.next.state)
+            @test !is_error(completeResult)
+            @test unwrap(completeResult) == some(true)
+        end
+
+        @testset "should propagate successful parse results" begin
+            baseParser     = option(["-n", "--name"], str())
+            optionalParser = optional(baseParser)
+
+            context = Context(["-n", "Alice"], optionalParser.initialState)
+            parseResult = parse(optionalParser, context)
+
+            @test !is_error(parseResult)
+            ps = unwrap(parseResult)
+
+            @test ps.next.buffer == String[]
+            @test ps.consumed == ("-n", "Alice")
+
+            # # optional keeps a collection of inner states
+            # @test ps.next.state isa AbstractVector
+            # @test length(ps.next.state) == 1
+        end
+
+        @testset "should propagate failed parse results" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            context = Context(["--help"], optionalParser.initialState)
+            parseResult = parse(optionalParser, context)
+
+            @test is_error(parseResult)
+            # pf = unwrap_error(parseResult)
+
+            # @test pf.consumed == 0
+            # @test occursin("No matched option", string(pf.error))
+        end
+
+        @testset "should complete with undefined when internal state is undefined" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            completeResult = complete(optionalParser, none(tstate(baseParser)))
+
+            @test !is_error(completeResult)
+            @test unwrap(completeResult) === none(Bool)
+        end
+
+        @testset "should complete with wrapped parser result when state is defined" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            # Simulate a collected successful inner state (as optional.parse would)
+            successfulState = some(Result{Bool, String}(Ok(true)))
+            completeResult  = complete(optionalParser, successfulState)
+
+            @test !is_error(completeResult)
+            @test unwrap(completeResult) == some(true)
+        end
+
+        @testset "should propagate wrapped parser completion failures" begin
+            baseParser     = option(["-p", "--port"], integer(; min = 1))
+            optionalParser = optional(baseParser)
+
+            # Simulate a collected failed inner state
+            failedState    = some(Result{Int, String}(Err("Port must be >= 1")))
+            completeResult = complete(optionalParser, failedState)
+
+            @test is_error(completeResult)
+            @test occursin("Port must be >= 1", string(unwrap_error(completeResult)))
+        end
+
+        # @testset "should work in object combinations - main use case" begin
+        #     parser = object((
+        #         verbose = option(["-v", "--verbose"]),
+        #         port    = optional(option("-p", "--port", integer())),
+        #         output  = optional(option("-o", "--output", string())),
+        #     ))
+
+        #     resultWithOptional = parse(parser, ["-v", "-p", "8080"])
+        #     @test !is_error(resultWithOptional)
+        #     val = unwrap(resultWithOptional)
+        #     @test val.verbose == true
+        #     @test val.port    == 8080
+        #     @test val.output  === nothing  # TS undefined -> Julia nothing
+
+        #     resultWithoutOptional = parse(parser, ["-v"])
+        #     @test !is_error(resultWithoutOptional)
+        #     val2 = unwrap(resultWithoutOptional)
+        #     @test val2.verbose == true
+        #     @test val2.port    === nothing
+        #     @test val2.output  === nothing
+        # end
+
+        @testset "should work with constant parsers" begin
+            baseParser     = constant(:hello)
+            optionalParser = optional(baseParser)
+
+            context     = Context(String[], optionalParser.initialState)
+            parseResult = parse(optionalParser, context)
+
+            @test !is_error(parseResult)
+            ps = unwrap(parseResult)
+
+            completeResult = complete(optionalParser, ps.next.state)
+            @test !is_error(completeResult)
+            @test unwrap(completeResult) == some(:hello)
+        end
+
+        @testset "should handle options terminator" begin
+            baseParser     = flag(["-v", "--verbose"])
+            optionalParser = optional(baseParser)
+
+            context = Context(["-v"], optionalParser.initialState)
+            context = Context{typeof(context.state)}(context.buffer, context.state, true)  # optionsTerminated=true
+
+            parseResult = parse(optionalParser, context)
+            @test is_error(parseResult)
+            pf = unwrap_error(parseResult)
+
+            @test pf.consumed == 0
+            @test occursin("No more options", string(pf.error))
+        end
+
+        @testset "should work with bundled short options through wrapped parser" begin
+            baseParser     = flag(["-v"])
+            optionalParser = optional(baseParser)
+
+            context     = Context(["-vd"], optionalParser.initialState)
+            parseResult = parse(optionalParser, context)
+
+            @test !is_error(parseResult)
+            ps = unwrap(parseResult)
+
+            @test ps.next.buffer == ["-d"]
+            @test ps.consumed    == ("-v",)
+
+            completeResult = complete(optionalParser, ps.next.state)
+            @test !is_error(completeResult)
+            @test unwrap(completeResult) == some(true)
+        end
+
+        @testset "should handle state transitions" begin
+            baseParser     = option(["-n", "--name"], str())
+            optionalParser = optional(baseParser)
+
+            # initial state should be "undefined" (nothing)
+            @test optionalParser.initialState === none(tstate(baseParser))
+
+            context     = Context(["-n", "test"], none(tstate(optionalParser)))
+            parseResult = parse(optionalParser, context)
+
+            @test !is_error(parseResult)
+            ps = unwrap(parseResult)
+
+            # @test ps.next.state isa AbstractVector
+            # @test length(ps.next.state) == 1
+
+            inner = ps.next.state
+            @test inner isa Option
+            innerres = @something base(inner)
+            @test !is_error(innerres)
+            @test unwrap(innerres) == "test"
         end
     end
 end

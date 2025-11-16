@@ -13,7 +13,7 @@ struct ArgOption{T, S, p, P}
 end
 
 
-function parse(p::ArgOption{T, S}, ctx::Context{S})::ParseResult{S, String} where {T, S <: Result{T, String}}
+function parse(p::ArgOption{T, S}, ctx::Context)::ParseResult{S, String} where {T, S <: Result{T, String}}
     if ctx.optionsTerminated
         return ParseErr(0, "No more options to be parsed.")
     elseif length(ctx.buffer) < 1

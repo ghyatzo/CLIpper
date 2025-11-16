@@ -2,7 +2,8 @@ module ComposableCLIParse
 
 using Accessors: @set, PropertyLens, insert, set
 using WrappedUnions: @wrapped, @unionsplit
-using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unwrap_error
+using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unwrap_error, base
+
 
 # based on: https://optique.dev/concepts
 
@@ -102,7 +103,10 @@ parser(x::ModWithDefault{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 priority(o::Parser) = priority(typeof(o))
 
 tval(::Type{Parser{T, S, p, P}}) where {T, S, p, P} = T
+tval(p::Parser) = tval(typeof(p))
 tstate(::Type{Parser{T, S, p, P}}) where {T, S, p, P} = S
+tstate(p::Parser) = tstate(typeof(p))
+
 
 Base.getproperty(p::Parser, f::Symbol) = @unionsplit Base.getproperty(p, f)
 parse(p::Parser, ctx::Context) = @unionsplit parse(p, ctx)
@@ -169,18 +173,20 @@ macro comment(_...) end
 
 @comment begin
     using ComposableCLIParse
-    args = ["--host", "me", "--verbose"]
+    args = ["--host", "me", "--verbose", "--test"]
 
     opt = option(["--host"], str(; metavar = "HOST"))
     flg = flag(["--verbose"])
+    flg2 = flag(["--test"])
 
     cst = constant(10)
 
     obj = object(
         "test", (
-            cst = cst,
+            # cst = cst,
             option = opt,
             flag = flg,
+            flag2 = flg2
         )
     )
 

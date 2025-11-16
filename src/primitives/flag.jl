@@ -12,7 +12,7 @@ struct ArgFlag{T, S, p, P}
 end
 
 
-function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool, String}})::ParseResult{Result{Bool, String}, String}
+function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context)::ParseResult{Result{Bool, String}, String}
 
     if ctx.optionsTerminated
         return ParseErr(0, "No more options to be parsed.")
