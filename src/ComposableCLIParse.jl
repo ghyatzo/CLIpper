@@ -77,7 +77,7 @@ include("parser.jl")
 include("valueparsers/valueparsers.jl")
 include("primitives/primitives.jl")
 include("constructors/object.jl")
-include("modifiers/optional.jl")
+include("modifiers/modifiers.jl")
 
 @wrapped struct Parser{T, S, p, P}
     union::Union{

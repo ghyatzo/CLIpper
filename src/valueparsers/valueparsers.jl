@@ -1,5 +1,5 @@
 # Value Parser interface
-# struct _ValueParser{T}
+# struct ValueParser{T}
 # 	metavar::String
 # 	# ... custom vars
 # end
@@ -18,6 +18,9 @@ end
     isnothing(m) && return Err("Expected a string matching pattern $(s.pattern), but got $input.")
     return Ok(input)
 end
+
+
+
 
 @kwdef struct Choice{T}
     metavar::String = "CHOICE"
@@ -38,6 +41,9 @@ end
     return Ok(c.values[index])
 end
 
+
+
+
 @kwdef struct IntegerVal{T}
     metaval::String = "INTEGER"
     #
@@ -56,6 +62,13 @@ end
 
     return Ok(val)
 end
+
+
+
+
+
+
+
 
 
 @wrapped struct ValueParser{T}

@@ -15,25 +15,24 @@ end
 function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool, String}})::ParseResult{Result{Bool, String}, String}
 
     if ctx.optionsTerminated
-        return Err(ParseFailure(0, "No more options to be parsed."))
+        return ParseErr(0, "No more options to be parsed.")
     elseif length(ctx.buffer) < 1
-        return Err(ParseFailure(0, "Expected a flag, got end of input."))
+        return ParseErr(0, "Expected a flag, got end of input.")
     end
 
     #= When the input contains `--` is a signal to stop parsing options =#
     if (ctx.buffer[1] === "--")
         next = Context(ctx.buffer[2:end], ctx.state, true)
-        return Ok(ParseSuccess(ctx.buffer[1:1], next))
+        return ParseOk(ctx.buffer[1:1], next)
     end
 
     if ctx.buffer[1] in p.names
 
         if !is_error(ctx.state) && unwrap(ctx.state)
-            return Err(ParseFailure(1, "$(ctx.buffer[1]) cannot be used multiple times"))
+            return ParseErr(1, "$(ctx.buffer[1]) cannot be used multiple times")
         end
 
-        return Ok(
-            ParseSuccess(
+        return ParseOk(
                 ctx.buffer[1:1],
 
                 Context(
@@ -42,7 +41,6 @@ function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool,
                     ctx.optionsTerminated
                 )
             )
-        )
     end
 
     #= When the input contains bundled options: -abc =#
@@ -54,11 +52,10 @@ function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool,
         startswith(ctx.buffer[1], short_opt) || continue
 
         if !is_error(ctx.state) && unwrap(ctx.state)
-            return Err(ParseFailure(1, "Flag $(short_opt) cannot be used multiple times"))
+            return ParseErr(1, "Flag $(short_opt) cannot be used multiple times")
         end
 
-        return Ok(
-            ParseSuccess(
+        return ParseOk(
                 ctx.buffer[1][1:2],
 
                 Context(
@@ -67,14 +64,11 @@ function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool,
                     ctx.optionsTerminated
                 )
             )
-        )
     end
 
-    return Err(
-        ParseFailure(
+    return ParseErr(
             0, "No Matched Flag for $(ctx.buffer[1])"
         )
-    )
 end
 
 function complete(p::ArgFlag, st::Result{Bool, String})::Result{Bool, String}

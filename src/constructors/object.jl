@@ -80,9 +80,6 @@ _recursive_parse_parsers(p::NamedTuple{labels}, ctx, error, all_consumed, anysuc
 
     result = (@unionsplit parse(child_parser, child_ctx))::ParseResult{typeof(child_state), String}
 
-    # @info result ctx
-    # @info
-
     if is_error(result)
         parse_err = unwrap_error(result)
         if error.consumed <= parse_err.consumed
@@ -125,12 +122,10 @@ function parse(p::Object{NamedTuple{fields, Tup}, S}, ctx::Context)::ParseResult
 
 
     if anysuccess
-        return Ok(
-            ParseSuccess{S}(
+        return ParseOk{S}(
                 allconsumed,
                 current_ctx
             )
-        )
     end
 
     #= if buffer is empty check if all parsers can complete anyway =#
@@ -138,96 +133,14 @@ function parse(p::Object{NamedTuple{fields, Tup}, S}, ctx::Context)::ParseResult
         all_can_complete, _ = _recursive_complete_parsers(p.parsers, ctx.state, (;))
 
         if all_can_complete
-            return Ok(ParseSuccess((), ctx))
+            return ParseOk((), ctx)
         end
     end
 
     return Err(error)
 end
 
-# function parse(p::Object{NamedTuple{fields, Tup}, S}, ctx::Context)::ParseResult{S, String} where {fields, Tup, S}
 
-# 	error = ParseFailure(0, "Expected argument, option or command, but got end of input.")
-
-# 	#= greedy parsing trying to consume as many field as possible =#
-# 	current_ctx = ctx
-# 	any_success = false
-
-# 	all_consumed = String[]
-
-# 	#= keep trying to parse fields until no more can be matched =#
-# 	made_progress = true
-# 	while (made_progress && length(ctx.buffer) > 0)
-# 		made_progress = false
-
-# 		for field in fields
-
-# 			child_parser_state = isnothing(current_ctx.state) || field ∉ keys(current_ctx.state) ?
-# 				p.initialState[field] : current_ctx.state[field]
-
-# 			child_parser_ctx = Context(
-# 				current_ctx.buffer,
-# 				child_parser_state,
-# 				current_ctx.optionsTerminated
-# 			)
-
-# 			result = (@unionsplit parse(p.parsers[field], child_parser_ctx))::ParseResult{typeof(child_parser_state), String}
-
-# 			if !is_error(result)
-# 				parse_ok = unwrap(result)
-
-# 				if length(parse_ok.consumed) > 0
-# 					newstate = @inline set(current_ctx.state, PropertyLens(field), parse_ok.next.state)::S
-
-# 					current_ctx = Context(
-# 						parse_ok.next.buffer,
-# 						newstate,
-# 						parse_ok.next.optionsTerminated
-# 					)
-# 					append!(all_consumed, parse_ok.consumed)
-# 					any_success = true
-# 					made_progress = true
-# 					break #= restart the field loop with an updated state =#
-# 				end
-
-# 			elseif is_error(result)
-# 				parse_err = unwrap_error(result)
-# 				if error.consumed < parse_err.consumed
-# 					error = parse_err
-# 				end
-# 			end
-# 		end
-# 	end
-
-# 	if any_success
-# 		return Ok(ParseSuccess{S}(
-# 			all_consumed,
-# 			current_ctx
-# 		))
-# 	end
-
-# 	#= if buffer is empty and no parser consumed input, check if all parsers can complete =#
-# 	if length(ctx.buffer) == 0
-# 		all_can_complete = true
-
-# 		for field in labels
-# 			field_state = isnothing(ctx.state) || field ∉ keys(ctx.state) ? p.initialState[field] : ctx.state[field]
-
-# 			complete_result = complete(p.parsers[field], field_state)
-
-# 			if is_error(complete_result)
-# 				all_can_complete = false
-# 				break
-# 			end
-# 		end
-
-# 		if all_can_complete
-# 			return Ok(ParseSuccess([], ctx))
-# 		end
-# 	end
-
-# 	return Err(error)
-# end
 
 _recursive_complete_parsers(::@NamedTuple{}, _, output::NamedTuple) =
     true, output
@@ -253,36 +166,3 @@ function complete(p::Object{T}, st::NamedTuple)::Result{T, String} where {T}
 
     return Ok(_result)
 end
-
-
-# function complete(p::Object{T}, st::NamedTuple)::Result{T, String} where {T}
-# 	@info st
-# 	_result = _build_result(T, p.parsers, st)
-# 	for mayberes in values(_result)
-# 		if mayberes isa Result && !(mayberes isa Option) && is_error(mayberes)
-# 			return Err(unwrap_error(mayberes))
-# 		end
-# 	end
-
-# 	return Ok(_result)
-# end
-
-
-# @generated function _build_result(
-# 		::Type{NamedTuple{objlabels, tvals}},
-# 		parsers::NamedTuple{objlabels, parsers_t},
-# 		st::NamedTuple{st_labels, tstates}
-# 	) where {objlabels, tvals, st_labels, tstates, parsers_t}
-
-# 	_filter_id = findall(∈(st_labels), objlabels)
-
-# 	labels = objlabels[_filter_id]
-# 	matching_tvals = tvals.parameters[_filter_id]
-
-# 	ex = Expr(:tuple)
-# 	for (label, val) in zip(labels, matching_tvals)
-# 		push!(ex.args, :($label = @? (@unionsplit complete(parsers[$(QuoteNode(label))], st[$(QuoteNode(label))]))::Result{$val, String}))
-# 	end
-
-# 	return ex
-# end
