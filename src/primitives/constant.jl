@@ -1,0 +1,21 @@
+struct ArgConstant{T, S, p, P}
+    initialState::S
+    _dummy::P
+end
+
+ArgConstant(val::T) where {T} = let
+    try
+        ArgConstant{T, Val{val}, 0, Nothing}(Val(val), nothing)
+    catch e
+        e isa TypeError && error("Constant does not support Strings in its types, use Symbols instead.")
+    end
+end
+ArgConstant(val::String) = error("Constant does not support plain Strings, use Symbols instead.")
+
+function parse(p::ArgConstant{T}, ctx::Context{Val{val}})::ParseResult{Val{val}, String} where {T, val}
+    return ParseOk(String[], ctx)
+end
+
+function complete(p::ArgConstant{T}, ::Val{val})::Result{T, String} where {T, val}
+    return Ok(convert(T, val))
+end

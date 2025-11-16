@@ -20,8 +20,6 @@ end
 end
 
 
-
-
 @kwdef struct Choice{T}
     metavar::String = "CHOICE"
     caseInsensitive::Bool = true
@@ -42,8 +40,6 @@ end
 end
 
 
-
-
 @kwdef struct IntegerVal{T}
     metaval::String = "INTEGER"
     #
@@ -62,13 +58,6 @@ end
 
     return Ok(val)
 end
-
-
-
-
-
-
-
 
 
 @wrapped struct ValueParser{T}

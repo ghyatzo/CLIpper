@@ -57,8 +57,9 @@ using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unw
 
 export argparse,
     # primitives
-    option,
+    constant,
     flag,
+    option,
 
     # valueparsers
     str,
@@ -83,6 +84,7 @@ include("modifiers/modifiers.jl")
     union::Union{
         ArgFlag{T, S, p, P},
         ArgOption{T, S, p, P},
+        ArgConstant{T, S, p, P},
         Object{T, S, p, P},
         ModOptional{T, S, p, P},
         ModWithDefault{T, S, p, P},
@@ -91,12 +93,13 @@ end
 
 parser(x::ArgFlag{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 parser(x::ArgOption{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
+parser(x::ArgConstant{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 parser(x::Object{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 parser(x::ModOptional{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 parser(x::ModWithDefault{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 
 (priority(::Type{Parser{T, S, p, P}})::Int) where {T, S, p, P} = p
-priority(o::Parser) = priority(tyepof(o))
+priority(o::Parser) = priority(typeof(o))
 
 tval(::Type{Parser{T, S, p, P}}) where {T, S, p, P} = T
 tstate(::Type{Parser{T, S, p, P}}) where {T, S, p, P} = S
@@ -108,6 +111,7 @@ Base.getproperty(p::Parser, f::Symbol) = @unionsplit Base.getproperty(p, f)
 # primitives
 option(names::Vector{String}, valparser::ValueParser{T}; kw...) where {T} = parser(ArgOption(names, valparser; kw...))
 flag(names::Vector{String}; kw...) = parser(ArgFlag(names; kw...))
+constant(val) = parser(ArgConstant(val))
 
 # constructors
 object(obj::NamedTuple) = parser(_object(obj))
@@ -126,7 +130,6 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
 
     while true
         mayberesult::ParseResult{S, String} = @unionsplit parse(pp, ctx)
-        # @info mayberesult
         #=
 			There is currently an issue. We need a mechanism to allow bypassing this check
 			To allow for potential "fixable" errors (think optional) to pass through to the
@@ -135,8 +138,6 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
 		=#
         if is_error(mayberesult)
             return Err(unwrap_error(mayberesult).error)
-            # ctx = @set ctx.state = newstate
-            # break
         end
         result = unwrap(mayberesult)
 
@@ -146,10 +147,10 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
         if (
                 length(ctx.buffer) > 0
                     && length(ctx.buffer) == length(previous_buffer)
-                    && ctx.buffer[0] === previous_buffer[0]
+                    && ctx.buffer[1] === previous_buffer[1]
             )
 
-            return Err("Unexpected option or argument: $(ctx.buffer[0]).")
+            return Err("Unexpected option or argument: $(ctx.buffer[1]).")
         end
 
         length(ctx.buffer) > 0 || break
@@ -164,11 +165,14 @@ macro comment(_...) end
     using ComposableCLIParse
     args = ["--host", "me", "--verbose"]
 
-    opt = option(["--host"], stringval(; metavar = "HOST"))
+    opt = option(["--host"], str(; metavar = "HOST"))
     flg = flag(["--verbose"])
+
+    cst = constant(10)
 
     obj = object(
         "test", (
+            cst = cst,
             option = opt,
             flag = flg,
         )

@@ -36,7 +36,49 @@ end
 
 @testset "Primitives" begin
 
-    using ComposableCLIParse: Context, parse
+    using ComposableCLIParse: Context, parse, priority, complete
+
+    @testset "Constant parser" begin
+        @testset "should create a parser that always returns the same value" begin
+            parser = constant(42)
+
+            @test priority(parser) == 0
+            @test parser.initialState == Val(42)
+        end
+
+        @testset "should parse without consuming any input" begin
+            parser = constant(:hello)
+            context = Context(["--option", "value"], Val(:hello))
+
+            result = @unionsplit parse(parser, context)
+            @test is_ok_and(result) do succ
+                @test succ.consumed == ()
+                @test succ.next == context
+                !is_error(result)
+            end
+        end
+        @testset "should complete successfully with a constant value" begin
+            parser = constant(69)
+            result = complete(parser, Val(69))
+
+            @test is_ok_and(result) do succ
+                @test succ == 69
+                !is_error(result)
+            end
+        end
+        @testset "should work with different value types" begin
+            stringconst = constant(:hello)
+            intconst = constant(123)
+            boolconst = constant(true)
+            namedtupleconst = constant((key = :value,))
+
+            @test (@? complete(stringconst, Val(:hello))) == :hello
+            @test (@? complete(intconst, Val(123))) == 123
+            @test (@? complete(boolconst, Val(true))) == true
+            @test (@? complete(namedtupleconst, Val((key = :hello,)))) == (key = :hello,)
+        end
+    end
+
 
     @testset "Flag parser" begin
 
