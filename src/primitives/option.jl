@@ -77,10 +77,10 @@ function parse(p::ArgOption{T, S}, ctx::Context{S})::ParseResult{S, String} wher
 
 		return Ok(
 			ParseSuccess(
-				Tuple(ctx.buffer[1:2]),
+				Tuple(ctx.buffer[1:1]),
 
 				Context(
-					ctx.buffer[3:end],
+					ctx.buffer[2:end],
 					result,
 					ctx.optionsTerminated
 				)

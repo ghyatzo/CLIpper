@@ -3,7 +3,6 @@ module ComposableCLIParse
 using Accessors: @set, PropertyLens, insert, set
 using WrappedUnions: @wrapped, @unionsplit
 using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unwrap_error
-using Infiltrator
 
 # based on: https://optique.dev/concepts
 
@@ -63,6 +62,7 @@ export  argparse,
 
 	# valueparsers
 	stringval,
+	choice,
 
 	# constructors
 	object,
@@ -125,7 +125,7 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
 
 	while true
 		mayberesult::ParseResult{S, String} = @unionsplit parse(pp, ctx)
-		@info mayberesult
+		# @info mayberesult
 		#=
 			There is currently an issue. We need a mechanism to allow bypassing this check
 			To allow for potential "fixable" errors (think optional) to pass through to the

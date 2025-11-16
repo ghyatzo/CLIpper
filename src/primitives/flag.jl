@@ -17,7 +17,7 @@ function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool,
 	if ctx.optionsTerminated
 		return Err(ParseFailure(0, "No more options to be parsed."))
 	elseif length(ctx.buffer) < 1
-		return Err(ParseFailure(0, "Expected flag got end of input."))
+		return Err(ParseFailure(0, "Expected a flag, got end of input."))
 	end
 
 	#= When the input contains `--` is a signal to stop parsing options =#
@@ -33,7 +33,7 @@ function parse(p::ArgFlag{Bool, Result{Bool, String}}, ctx::Context{Result{Bool,
 		end
 
 		return Ok(ParseSuccess(
-			Tuple(ctx.buffer[1:1]),
+			ctx.buffer[1:1],
 
 			Context(
 				ctx.buffer[2:end],

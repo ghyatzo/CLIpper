@@ -12,6 +12,8 @@ struct ParseSuccess{S}
 	next::Context{S}
 end
 
+ParseSuccess(cons::Vector{String}, next) = ParseSuccess((cons...), next)
+ParseSuccess(cons::String, next) = ParseSuccess((cons,), next)
 
 struct ParseFailure{E}
 	consumed::Int
