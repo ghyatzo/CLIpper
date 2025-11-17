@@ -8,25 +8,25 @@ using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unw
 # based on: https://optique.dev/concepts
 
 # primitive parsers: building blocks of command line interfaces
-#	- constant() ok
-#	- option() ok
-#	- flag() ok
-#	- argument()
+#	OK constant()
+#	OK option()
+#	OK flag()
+#	OK argument()
 #	- command()
 #	- parsers priority: command > argument > option > flag > constant
 
 
 # value parsers: specialized components that convert raw string into desired outputs
-#	- string(pattern)
-#	- integer(min, max, type)
-#	- float(min, max, allowInfinity, allowNan)
-#	- choice([list of choices], caseinsensitive)
-#	- uri()
-#	- uuid()
-#	- path()
+#	OK string(pattern) OK
+#	OK integer(min, max, type)
+#	OK float(min, max, allowInfinity, allowNan)
+#	OK choice([list of choices], caseinsensitive)
+#	- uri() # also this one shold be easy?
+#	- uuid() # this one is easy
+#	- path() # might be a bit out of scope
 #	- instant() # moment in time
 #	- duration()
-#	- zone-datetime()
+#	- zone-datetime() # needs external package
 #	- date()
 #	- time()
 #	- datetime()
@@ -41,14 +41,14 @@ using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unw
 
 
 # modifying combinators: Transform existing Parsers adding additional behaviour on top of the core one
-#	- optional()
-#	- withDefault()
+#	OK optional()
+#	OK withDefault()
 #	- map()
 #	- multiple(min, max) (match multiple times, collect into an array.)
 #	-
 
 # construct combinators: combine different parsers into new ones
-# 	- object(), combines multiple named parsers into a single parser that produces a single object
+# 	OK object(), combines multiple named parsers into a single parser that produces a single object
 #	- tuple(), combines parsers to produce tuple of results. preserves order.
 #	- or(), mutually exclusive alternatives
 #	- merge(), takes two parsers and generate a new single parser combining both
