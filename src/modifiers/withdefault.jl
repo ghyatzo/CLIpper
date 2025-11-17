@@ -4,26 +4,33 @@ struct ModWithDefault{T, S, p, P}
     #
     default::T
 
-    ModWithDefault(parser::P, default::T) where {P, T} = let
-        if tval(P) != T
-            error("Expected default of type $(tval(P)), got $T")
-        end
-        new{T, tstate(P), priority(P), P}(parser.initialState, parser, default)
+    ModWithDefault(parser::P, default::T) where {T, P <: Parser{T}} = let
+        new{T, Option{tstate(P)}, priority(P), P}(none(tstate(P)), parser, default)
     end
 end
 
 function parse(p::ModWithDefault{T, S}, ctx::Context)::ParseResult{S, String} where {T, S}
-    result = parse(p.parser, ctx)::ParseResult{S, String}
+    result = parse(p.parser, ctx)::ParseResult{tstate(p.parser), String}
 
     if !is_error(result)
         parse_ok = unwrap(result)
-        return ParseOk(parse_ok.consumed, parse_ok.next)
+        newctx = set(parse_ok.next, PropertyLens(:state), some(parse_ok.next.state))
+        return ParseOk(parse_ok.consumed, newctx)
     else
-        newctx = (@set ctx.state = S(Err(unwrap_error(result).error)))
-        return ParseOk(String[], newctx)
+        parse_err = unwrap_error(result)
+        return ParseErr(parse_err.consumed, parse_err.error)
     end
 end
 
-function complete(p::ModWithDefault{T, S}, st::S)::Result{T, String} where {T, S}
-    return is_error(st) ? Ok(p.default) : complete(p.parser, st)
+function complete(p::ModWithDefault{T, S}, maybestate::S)::Result{T, String} where {T, S}
+    state = base(maybestate)
+    isnothing(state) && return Ok(none(T))
+
+    result = complete(p.parser, something(state))::Result{T, String}
+
+    if !is_error(result)
+        return Ok(unwrap(result))
+    else
+        return Err(unwrap_error(result))
+    end
 end
