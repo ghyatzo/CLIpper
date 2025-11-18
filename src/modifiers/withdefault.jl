@@ -24,7 +24,7 @@ end
 
 function complete(p::ModWithDefault{T, S}, maybestate::S)::Result{T, String} where {T, S}
     state = base(maybestate)
-    isnothing(state) && return Ok(none(T))
+    isnothing(state) && return Ok(p.default)
 
     result = complete(p.parser, something(state))::Result{T, String}
 
