@@ -2,16 +2,16 @@
     union::Union{
         Missing, # Command did not match anything yet
         Nothing, # Command did match something
-        Result{S,String} # Command is parsing with its child parser
+        Result{S, String}, # Command is parsing with its child parser
     }
 end
 
 CommandState(::Nothing) = CommandState{Nothing}(nothing)
 CommandState(::Missing) = CommandState{Missing}(missing)
-CommandState(s::S) where {S} = CommandState{Result{S,String}}(Ok(s))
+CommandState(s::S) where {S} = CommandState{Result{S, String}}(Ok(s))
 
 
-struct ArgCommand{T,S,_p,P}
+struct ArgCommand{T, S, _p, P}
     initialState::S
     parser::P
     #
@@ -20,14 +20,14 @@ struct ArgCommand{T,S,_p,P}
     description::String
     footer::String
 
-    ArgCommand(name, parser::P; brief="", description="", footer="") where {P<:Parser} =
-        new{tval(P),CommandState{tstate(P)},15,P}(CommandState(nothing), parser, name, brief, description, footer)
+    ArgCommand(name, parser::P; brief = "", description = "", footer = "") where {P} =
+        new{tval(P), CommandState{tstate(P)}, 15, P}(CommandState(nothing), parser, name, brief, description, footer)
 end
 
-parse(p::ArgCommand, ctx)::ParseResult{String,String} = ParseErr(0, "Invalid command state. (YOU REACHED AN UNREACHABLE).")
+parse(p::ArgCommand, ctx)::ParseResult{String, String} = ParseErr(0, "Invalid command state. (YOU REACHED AN UNREACHABLE).")
 
 
-function parse(p::ArgCommand, ctx::Context{CommandState{Missing}})::ParseResult{CommandState{Nothing},String} where {T,S}
+function parse(p::ArgCommand, ctx::Context{CommandState{Missing}})::ParseResult{CommandState{Nothing}, String} where {T, S}
     # command not yet matched
     # check if it starts with our command name
     if length(ctx.buffer) < 1 || ctx.buffer[1] != p.name
@@ -50,7 +50,7 @@ function parse(p::ArgCommand, ctx::Context{CommandState{Missing}})::ParseResult{
     )
 end
 
-function parse(p::ArgCommand{T,S}, ctx::Context{CommandState{Nothing}})::ParseResult{S,String} where {T,S}
+function parse(p::ArgCommand{T, S}, ctx::Context{CommandState{Nothing}})::ParseResult{S, String} where {T, S}
     # command did match, start the inner parser
     result = parse(p.parser, p.parser.initialState)
 
@@ -83,4 +83,3 @@ function parse(p::ArgCommand, ctx::Context)::ParseResult
         return result
     end
 end
-

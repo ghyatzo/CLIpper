@@ -271,7 +271,8 @@ end
                     output = insert(output, PropertyLens($(QuoteNode(field))), unwrap(result))
                 end
             end
-        end)
+        )
+        i += 1
     end
 
     post = :(return true, output)

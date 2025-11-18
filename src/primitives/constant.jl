@@ -19,6 +19,6 @@ function parse(p::ArgConstant{T, Result{Val{val}, String}}, ctx::Context)::Parse
     return ParseOk(String[], constctx)
 end
 
-function complete(p::ArgConstant{T, Result{Val{val}, String}}, ::Result{Val{val},String})::Result{T, String} where {T, val}
+function complete(p::ArgConstant{T, Result{Val{val}, String}}, ::Result{Val{val}, String})::Result{T, String} where {T, val}
     return Ok(convert(T, val))
 end

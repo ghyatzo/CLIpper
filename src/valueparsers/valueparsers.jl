@@ -20,9 +20,6 @@ end
 end
 
 
-
-
-
 @kwdef struct Choice{T}
     metavar::String = "CHOICE"
     caseInsensitive::Bool = true
@@ -43,9 +40,6 @@ end
 end
 
 
-
-
-
 @kwdef struct IntegerVal{T}
     metavar::String = "INTEGER"
     #
@@ -64,9 +58,6 @@ end
 
     return Ok(val)
 end
-
-
-
 
 
 @kwdef struct FloatVal{T}
@@ -106,7 +97,11 @@ end
 end
 ((u::UUIDVal)(input::String)::Result{UUID, String}) = let
 
-    maybeuuid = try UUID(input) catch; nothing end
+    maybeuuid = try
+        UUID(input)
+    catch
+        nothing
+    end
     if isnothing(maybeuuid)
         return Err("Malformed UUID string: `$input`.")
     end
@@ -119,8 +114,6 @@ end
     return Err("Expected UUID of version [$(join(u.allowedVersions, ','))], but got version $version")
 
 end
-
-
 
 
 @wrapped struct ValueParser{T}
@@ -153,7 +146,7 @@ u16(; kw...) = integer(UInt16, ; kw...)
 u32(; kw...) = integer(UInt32, ; kw...)
 u64(; kw...) = integer(UInt64, ; kw...)
 
-flt(::Type{T}; kw...) where {T} = ValueParser{T}(FloatVal{T}(; type=T, kw...))
+flt(::Type{T}; kw...) where {T} = ValueParser{T}(FloatVal{T}(; type = T, kw...))
 flt(; kw...) = ValueParser{Float64}(FloatVal{Float64}(; kw...))
 
 uuid(; kw...) = ValueParser{UUID}(UUIDVal{UUID}(; kw...))

@@ -6,7 +6,6 @@ struct ArgArgument{T, S, p, P}
     description::String
 
 
-
     ArgArgument(valparser::ValueParser{T}; description = "") where {T} =
         new{T, Option{Result{T, String}}, 5, Nothing}(none(Result{T, String}), nothing, valparser, description)
 end
@@ -24,7 +23,7 @@ function parse(p::ArgArgument{T, S}, ctx::Context)::ParseResult{S, String} where
         if ctx.buffer[1] == "--"
             options_terminated = true
             i += 1
-        elseif !isnothing(match(optpattern, ctx.buffer[1+i]))
+        elseif !isnothing(match(optpattern, ctx.buffer[1 + i]))
             return ParseErr(i, "Expected an argument, but got an option/flag.")
         end
     end
@@ -37,13 +36,12 @@ function parse(p::ArgArgument{T, S}, ctx::Context)::ParseResult{S, String} where
         return ParseErr(i, "The argument `$(metavar(p.valparser))` cannot be used multiple times.")
     end
 
-    @info "buffers" i ctx.buffer[i+1] ctx.buffer[1:i+1] ctx.buffer[i+2:end]
-    result = p.valparser(ctx.buffer[1+i])
+    result = p.valparser(ctx.buffer[1 + i])
 
     return ParseOk(
-        ctx.buffer[1:i+1],
+        ctx.buffer[1:(i + 1)],
         Context(
-            ctx.buffer[i+2:end],
+            ctx.buffer[(i + 2):end],
             some(result),
             options_terminated
         )

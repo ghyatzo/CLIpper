@@ -48,7 +48,7 @@ using UUIDs
         err = f("nan")
         @test is_error(err) && occursin("NaNs", unwrap_error(err))
 
-        finfnan = flt(allowInfinity=true, allowNan = true)
+        finfnan = flt(allowInfinity = true, allowNan = true)
         @test isinf(@? finfnan("-inf"))
         @test isnan(@? finfnan("nan"))
 
@@ -118,9 +118,9 @@ end
             boolconst = @constant(true)
             namedtupleconst = @constant((key = :value,))
 
-            @test (@? complete(stringconst,     Result{Val{:hello}, String}(Ok(Val(:hello))))) == :hello
-            @test (@? complete(intconst,        Result{Val{123}, String}(Ok(Val(123))))) == 123
-            @test (@? complete(boolconst,       Result{Val{true}, String}(Ok(Val(true))))) == true
+            @test (@? complete(stringconst, Result{Val{:hello}, String}(Ok(Val(:hello))))) == :hello
+            @test (@? complete(intconst, Result{Val{123}, String}(Ok(Val(123))))) == 123
+            @test (@? complete(boolconst, Result{Val{true}, String}(Ok(Val(true))))) == true
             @test (@? complete(namedtupleconst, Result{Val{(key = :value,)}, String}(Ok(Val((key = :value,)))))) == (key = :value,)
         end
 
@@ -129,6 +129,8 @@ end
             @test_opt @constant(123)
             @test_opt @constant(true)
             @test_opt @constant((key = :value,))
+
+            @test_opt argparse(@constant(10), String[])
         end
     end
 
@@ -370,6 +372,9 @@ end
 end
 
 @testset "Constructors" begin
+
+    using ComposableCLIParse: Context, parse, priority, complete, tval, tstate
+
     @testset "Objects" begin
 
         @testset "should combine multiple parsers into an object" begin
@@ -542,10 +547,13 @@ end
 end
 
 @testset "Modifiers" begin
-   @testset "Optional parser" begin
+
+    using ComposableCLIParse: Context, parse, priority, complete, tval, tstate
+
+    @testset "Optional parser" begin
 
         @testset "should create a parser with same priority as wrapped parser" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             @test priority(optionalParser) == priority(baseParser)
@@ -554,7 +562,7 @@ end
         end
 
         @testset "should return wrapped parser value when it succeeds" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             context = Context(["-v"], optionalParser.initialState)
@@ -570,7 +578,7 @@ end
         end
 
         @testset "should propagate successful parse results" begin
-            baseParser     = option(("-n", "--name"), str())
+            baseParser = option(("-n", "--name"), str())
             optionalParser = optional(baseParser)
 
             context = Context(["-n", "Alice"], optionalParser.initialState)
@@ -588,7 +596,7 @@ end
         end
 
         @testset "should propagate failed parse results" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             context = Context(["--help"], optionalParser.initialState)
@@ -602,7 +610,7 @@ end
         end
 
         @testset "should complete with undefined when internal state is undefined" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             completeResult = complete(optionalParser, none(tstate(baseParser)))
@@ -612,56 +620,69 @@ end
         end
 
         @testset "should complete with wrapped parser result when state is defined" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             # Simulate a collected successful inner state (as optional.parse would)
             successfulState = some(Result{Bool, String}(Ok(true)))
-            completeResult  = complete(optionalParser, successfulState)
+            completeResult = complete(optionalParser, successfulState)
 
             @test !is_error(completeResult)
             @test unwrap(completeResult) == some(true)
         end
 
         @testset "should propagate wrapped parser completion failures" begin
-            baseParser     = option(("-p", "--port"), integer(; min = 1))
+            baseParser = option(("-p", "--port"), integer(; min = 1))
             optionalParser = optional(baseParser)
 
             # Simulate a collected failed inner state
-            failedState    = some(Result{Int, String}(Err("Port must be >= 1")))
+            failedState = some(Result{Int, String}(Err("Port must be >= 1")))
             completeResult = complete(optionalParser, failedState)
 
             @test is_error(completeResult)
             @test occursin("Port must be >= 1", string(unwrap_error(completeResult)))
         end
 
-        # @testset "should work in object combinations - main use case" begin
-        #     parser = object((
-        #         verbose = option(["-v", "--verbose"]),
-        #         port    = optional(option("-p", "--port", integer())),
-        #         output  = optional(option("-o", "--output", string())),
-        #     ))
+        @testset "should work in object combinations - main use case" begin
+            obj = object(
+                (
+                    verbose = flag("-v", "--verbose"),
+                    port = (optional ∘ option)(("-p", "--port"), integer()),
+                    output = (optional ∘ option)(("-o", "--output"), str()),
+                )
+            )
 
-        #     resultWithOptional = parse(parser, ["-v", "-p", "8080"])
-        #     @test !is_error(resultWithOptional)
-        #     val = unwrap(resultWithOptional)
-        #     @test val.verbose == true
-        #     @test val.port    == 8080
-        #     @test val.output  === nothing  # TS undefined -> Julia nothing
+            ctx = Context(["-v", "-p", "8080"], obj.initialState)
+            resultWithOptional = parse(obj, ctx)
+            @test !is_error(resultWithOptional)
+            val = unwrap(resultWithOptional)
 
-        #     resultWithoutOptional = parse(parser, ["-v"])
-        #     @test !is_error(resultWithoutOptional)
-        #     val2 = unwrap(resultWithoutOptional)
-        #     @test val2.verbose == true
-        #     @test val2.port    === nothing
-        #     @test val2.output  === nothing
-        # end
+            completeResult = complete(obj, val.next.state)
+            @test !is_error(completeResult)
+            val = unwrap(completeResult)
+            @test val.verbose == true
+            @test (@something base(val.port)) == 8080
+            @test base(val.output) === nothing
+
+            ctx = Context(["-v"], obj.initialState)
+            resultWithoutOptional = parse(obj, ctx)
+            @test !is_error(resultWithoutOptional)
+            val2 = unwrap(resultWithoutOptional)
+
+            completeResult = complete(obj, val2.next.state)
+            @test !is_error(completeResult)
+            val2 = unwrap(completeResult)
+            @info val2
+            @test val2.verbose == true
+            @test base(val2.port) === nothing
+            @test base(val2.output) === nothing
+        end
 
         @testset "should work with constant parsers" begin
-            baseParser     = @constant(:hello)
+            baseParser = @constant(:hello)
             optionalParser = optional(baseParser)
 
-            context     = Context(String[], optionalParser.initialState)
+            context = Context(String[], optionalParser.initialState)
             parseResult = parse(optionalParser, context)
 
             @test !is_error(parseResult)
@@ -673,7 +694,7 @@ end
         end
 
         @testset "should handle options terminator" begin
-            baseParser     = flag("-v", "--verbose")
+            baseParser = flag("-v", "--verbose")
             optionalParser = optional(baseParser)
 
             context = Context(["-v"], optionalParser.initialState)
@@ -688,17 +709,17 @@ end
         end
 
         @testset "should work with bundled short options through wrapped parser" begin
-            baseParser     = flag("-v")
+            baseParser = flag("-v")
             optionalParser = optional(baseParser)
 
-            context     = Context(["-vd"], optionalParser.initialState)
+            context = Context(["-vd"], optionalParser.initialState)
             parseResult = parse(optionalParser, context)
 
             @test !is_error(parseResult)
             ps = unwrap(parseResult)
 
             @test ps.next.buffer == ["-d"]
-            @test ps.consumed    == ("-v",)
+            @test ps.consumed == ("-v",)
 
             completeResult = complete(optionalParser, ps.next.state)
             @test !is_error(completeResult)
@@ -706,13 +727,13 @@ end
         end
 
         @testset "should handle state transitions" begin
-            baseParser     = option(("-n", "--name"), str())
+            baseParser = option(("-n", "--name"), str())
             optionalParser = optional(baseParser)
 
             # initial state should be "undefined" (nothing)
             @test optionalParser.initialState === none(tstate(baseParser))
 
-            context     = Context(["-n", "test"], none(tstate(optionalParser)))
+            context = Context(["-n", "test"], none(tstate(optionalParser)))
             parseResult = parse(optionalParser, context)
 
             @test !is_error(parseResult)
@@ -729,14 +750,14 @@ end
         end
 
         @testset "should be type stable" begin
-            baseParser     = option(("-n", "--name"), str())
+            baseParser = option(("-n", "--name"), str())
             @test_opt optional(baseParser)
             optionalParser = optional(baseParser)
 
             # initial state should be "undefined" (nothing)
             @test optionalParser.initialState === none(tstate(baseParser))
 
-            context     = Context(["-n", "test"], none(tstate(optionalParser)))
+            context = Context(["-n", "test"], none(tstate(optionalParser)))
 
             @test_opt parse(optionalParser, context)
         end
@@ -850,11 +871,13 @@ end
         end
 
         @testset "should work in object combinations - main use case" begin
-            parser = object((
-                verbose = flag("-v", "--verbose"),
-                port    = (withDefault(8080) ∘ option)(("--port", "-p"),integer()),
-                host    = (withDefault("localhost") ∘ option)(("--host", "-h"), str()),
-            ))
+            parser = object(
+                (
+                    verbose = flag("-v", "--verbose"),
+                    port = (withDefault(8080) ∘ option)(("--port", "-p"), integer()),
+                    host = (withDefault("localhost") ∘ option)(("--host", "-h"), str()),
+                )
+            )
 
             # Defaults case
             argv_defaults = ["-v"]
@@ -902,10 +925,10 @@ end
         end
 
         @testset "should work with different value types" begin
-            stringParser  = withDefault(option(string(), "-s"), "default-string")
-            numberParser  = withDefault(option(integer(), "-n"), 42)
+            stringParser = withDefault(option(string(), "-s"), "default-string")
+            numberParser = withDefault(option(integer(), "-n"), 42)
             booleanParser = withDefault(option("-b"), true)
-            arrayParser   = withDefault(@constant([1, 2, 3]), [1, 2, 3])
+            arrayParser = withDefault(@constant([1, 2, 3]), [1, 2, 3])
 
             # Test string default
             stringResult = complete(stringParser, nothing)
@@ -938,7 +961,7 @@ end
         end
 
         @testset "should propagate wrapped parser completion failures" begin
-            baseParser = option(integer(; min=1), "--port", "-p")
+            baseParser = option(integer(; min = 1), "--port", "-p")
             defaultParser = withDefault(baseParser, 8080)
 
             # Manually feed a failing completion state from the wrapped parser
@@ -973,10 +996,12 @@ end
         end
 
         @testset "should work with argument parsers in object context" begin
-            parser = object((
-                verbose = flag("-v", "--verbose"),
-                file    = withDefault(argument(string(; metavar="FILE")), "input.txt"),
-            ))
+            parser = object(
+                (
+                    verbose = flag("-v", "--verbose"),
+                    file = withDefault(argument(string(; metavar = "FILE")), "input.txt"),
+                )
+            )
 
             res1 = argparse(parser, ["-v", "custom.txt"])
             @test !is_error(res1)
@@ -997,11 +1022,13 @@ end
         end
 
         @testset "should work in complex combinations with validation" begin
-            parser = object((
-                command = option("-c", "--command", string()),
-                port    = withDefault(option("-p", "--port", integer(; min=1024, max=0xffff)), 8080),
-                debug   = withDefault(option("-d", "--debug"), false),
-            ))
+            parser = object(
+                (
+                    command = option("-c", "--command", string()),
+                    port = withDefault(option("-p", "--port", integer(; min = 1024, max = 0xffff)), 8080),
+                    debug = withDefault(option("-d", "--debug"), false),
+                )
+            )
 
             validResult = argparse(parser, ["-c", "start", "-p", "3000", "-d"])
             @test !is_error(validResult)

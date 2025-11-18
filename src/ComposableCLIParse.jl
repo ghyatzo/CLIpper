@@ -130,7 +130,9 @@ complete(p::Parser, st) = @unionsplit complete(p, st)
 option(names::Tuple{Vararg{String}}, valparser::ValueParser{T}; kw...) where {T} = parser(ArgOption(Tuple(names), valparser; kw...))
 option(names::String, valparser::ValueParser{T}; kw...) where {T} = parser(ArgOption((names,), valparser; kw...))
 flag(names...; kw...) = parser(ArgFlag(names; kw...))
-macro constant(val) :(parser(ArgConstant($val))) end
+macro constant(val)
+    return :(parser(ArgConstant($val)))
+end
 argument(valparser::ValueParser{T}; kw...) where {T} = parser(ArgArgument(valparser; kw...))
 
 # constructors
@@ -140,7 +142,7 @@ object(objlabel, obj::NamedTuple) = parser(_object(obj; label = objlabel))
 # modifiers
 optional(p::Parser) = parser(ModOptional(p))
 withDefault(p::Parser{T}, default::T) where {T} = parser(ModWithDefault(p, default))
-
+withDefault(default::T) where {T} = (p::Parser{T}) -> parser(ModWithDefault(p, default))
 
 #####
 # entry point
@@ -202,7 +204,7 @@ macro comment(_...) end
             # cst = cst,
             option = opt,
             flag = flg,
-            flag2 = flg2
+            flag2 = flg2,
         )
     )
 
