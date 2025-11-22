@@ -37,6 +37,10 @@ end
         include("constructors/object.jl")
     end
 
+    @testset "Or" begin
+        include("constructors/or.jl")
+    end
+
 end
 
 @testset "Modifiers" begin

@@ -1,7 +1,7 @@
 module ComposableCLIParse
 
-using Accessors: @set, PropertyLens, insert, set
-using WrappedUnions: @wrapped, @unionsplit
+using Accessors: @set, PropertyLens, IndexLens, insert, set
+using WrappedUnions: WrappedUnions, @wrapped, @unionsplit, unwrap as unwrapunion
 using ErrorTypes: @?, Err, Ok, Option, Result, is_error, none, some, unwrap, unwrap_error, base, is_ok_and
 using UUIDs: UUID, uuid_version
 
@@ -101,7 +101,7 @@ include("modifiers/modifiers.jl")
         ArgConstant{T,S,p,P},
         ArgArgument{T,S,p,P},
         ConstrObject{T,S,p,P},
-        # ConstrOr{T,S,p,P},
+        ConstrOr{T,S,p,P},
         ModOptional{T,S,p,P},
         ModWithDefault{T,S,p,P},
         # ArgCommand{T,S,p,P},
@@ -127,6 +127,8 @@ tval(::Type{Parser{T,S,p,P}}) where {T,S,p,P} = T
 tval(p::Parser) = tval(typeof(p))
 tstate(::Type{Parser{T,S,p,P}}) where {T,S,p,P} = S
 tstate(p::Parser) = tstate(typeof(p))
+ptypes(p::Parser) = ptypes(typeof(p))
+ptypes(::Type{Parser{T, S, p, P}}) where {T,S,p,P} = P
 
 
 Base.getproperty(p::Parser, f::Symbol) = @unionsplit Base.getproperty(p, f)
