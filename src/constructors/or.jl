@@ -1,4 +1,4 @@
-const OrState{X} = Tuple{Int,X} # X should be a Tuple of Option{ParseSuccess{SP1}} etc
+const OrState{I, X} = Tuple{I,X} # X should be a Tuple of Option{ParseSuccess{SP1}} and I a Val{int position}
 
 # a parser that returns the first parsers that matches, in the order provided!
 struct ConstrOr{T,S,p,P} <: AbstractParser{T, S, p, P}
@@ -6,30 +6,30 @@ struct ConstrOr{T,S,p,P} <: AbstractParser{T, S, p, P}
     parsers::P
 end
 
-ConstrOr(parsers::Tuple) = let
-    # inner_state_t = map(parsers) do p
-    #     Option{ParseSuccess{tstate(p)}}
-    # end
+ConstrOr(parsers::PTup) where {PTup <: Tuple} = let
+
     inner_state = map(parsers) do p
         none(ParseSuccess{tstate(p)})
     end
-    actual_parsers = map(unwrapunion, parsers)
+
+    possible_vals = ntuple(fieldcount(PTup)+1) do i; Val{i-1} end
     ConstrOr{
         Union{map(tval, parsers)...},
-        OrState{typeof(inner_state)},
+        OrState{Union{possible_vals...}, typeof(inner_state)},
         mapreduce(p -> priority(p), max, parsers),
         typeof(parsers)
-    }((0, inner_state), parsers)
+    }((Val(0), inner_state), parsers)
 end
 
-
-@generated function _generated_or_parse(parsers::PTup, ctx::Context) where {PTup <: Tuple}
+@generated function _generated_or_parse(parsers::PTup, ctx::Context{OrState{I, X}}, ::Val{j}) where {PTup <: Tuple, I, X <: Tuple, j}
     preamble = quote
         error = length(ctx.buffer) < 1 ?
             (0, "No matching option or command.") : (0, "Unexpected option or subcommand: $(ctx.buffer[1])")
     end
-    N = length(PTup.parameters)
+    N = fieldcount(PTup)
     unrolled_loop = Expr(:block)
+
+    valunion = Union{map(typeof∘Val, Tuple(collect(0:N)))...}
     for i in 1:N
         parser_t = PTup.parameters[i]
         push!(unrolled_loop.args, quote
@@ -45,19 +45,18 @@ end
                 # If we successfully match something, but the current state is telling us that we've already matched
                 # something else,
                 # and those two things aren't the same thing, then error. 'Or' only matches one parser.
-                if ctx.state[1] != 0 && ctx.state[1] != $i
-                    already_matched_state_id = ctx.state[1]
+                if $j != 0 && $j != $i
                     return ParseErr(length(ctx.buffer) - length(parse_ok.next.buffer),
-                        "$(unwrap(ctx.state[2][already_matched_state_id]).consumed[1]) and $(parse_ok.consumed[1]) can't be used together.")
+                        "$(unwrap(ctx.state[2][$j]).consumed[1]) and $(parse_ok.consumed[1]) can't be used together.")
                 end
 
                 new_innerstate = set(ctx.state[2], IndexLens($i), some(parse_ok))
 
 
                 return ParseOk(
-                    parse_ok.consumed, Context(
+                    parse_ok.consumed, Context{OrState{$valunion, $X}}(
                         parse_ok.next.buffer,
-                        ($i, new_innerstate),
+                        (Val($i), new_innerstate),
                         parse_ok.next.optionsTerminated
                     )
                 )
@@ -79,9 +78,14 @@ end
     end
 end
 
-(parse(p::ConstrOr{T, OrState{S}}, ctx::Context{OrState{S}})::ParseResult{OrState{S},String}) where {T, S} =
-    _generated_or_parse(p.parsers, ctx)
+parse(p::ConstrOr{T, OrState{I, S}}, ctx::Context{OrState{I, S}}) where {T, I, S <: Tuple} = let
+    valunion = Union{ntuple(i-> Val{i-1}, fieldcount(S)+1)...}
+    state_t = typeof(map(p.parsers) do p
+        none(ParseSuccess{tstate(p)})
+    end)
 
+    convert(ParseResult{OrState{valunion, state_t}, String}, _generated_or_parse(p.parsers, ctx, ctx.state[1]))
+end
 # function _parse(p::ConstrOr{T, OrState{S}}, ctx::Context{OrState{S}})::ParseResult{OrState{S},String} where {T, S}
 #     error = length(ctx.buffer) < 1 ?
 #             (0, "No matching option or command.") : (0, "Unexpected option or subcommand: $(ctx.buffer[1])")
@@ -129,11 +133,14 @@ end
 #     return ParseErr(error[1], error[2])
 # end
 
-function complete(p::ConstrOr{T}, orstate::OrState{S})::Result{T,String} where {T,S}
-    orstate[1] == 0 && return Err("No matching option or command.")
-    ith, allmaybestates = orstate
+function _generated_or_complete(parsers)
+end
 
-    result = @unionsplit complete(p.parsers[ith], unwrap(allmaybestates[ith]).next.state)
+function complete(p::ConstrOr{T}, orstate::OrState{Val{i}, S})::Result{T,String} where {i, T, S}
+    i == 0 && return Err("No matching option or command.")
+    _, allmaybestates = orstate
+
+    result = @unionsplit complete(p.parsers[i], unwrap(allmaybestates[i]).next.state)
 
     if !is_error(result)
         return Ok(unwrap(result))

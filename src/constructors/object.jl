@@ -30,7 +30,7 @@ ConstrObject{T}(initialState::TState, parsers, label) where {T,TState} =
 Base.@assume_effects :foldable function _sort_obj_labels(labels, ::Type{PTup}
 ) where {PTup<:Tuple}
 
-    perm = sortperm(collect(PTup.parameters); by=priority, rev=true)
+    perm = sortperm(collect(fieldtypes(PTup)); by=priority, rev=true)
     return labels[perm]
 end
 
@@ -50,7 +50,7 @@ _object(parsers_obj::NamedTuple; label="") =
         priorities = map(priority, parsers_t)
 
         parsers_obj_tval = NamedTuple{labels,Tuple{parsers_tvals...}}
-        init_state = NamedTuple{labels}(map(p -> getproperty(p, :initialState), parsers))
+        init_state = NamedTuple{labels}( map(p -> p.initialState, parsers))
 
         ConstrObject{parsers_obj_tval}(init_state, sparsers_obj, label)
     end

@@ -5,7 +5,7 @@
     orParser = or(parser1, parser2)
 
     using ComposableCLIParse: OrState, FlagState, ParseSuccess
-    @test getproperty(orParser, :initialState) isa OrState{Tuple{Option{ParseSuccess{FlagState}}, Option{ParseSuccess{FlagState}}}}
+    @test getproperty(orParser, :initialState) isa OrState{Union{Val{0}, Val{1}, Val{2}}, Tuple{Option{ParseSuccess{FlagState}}, Option{ParseSuccess{FlagState}}}}
     @test priority(orParser) == max(priority(parser1), priority(parser2))
 end
 

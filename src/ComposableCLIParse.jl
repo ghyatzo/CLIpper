@@ -151,10 +151,10 @@ withDefault(default::T) where {T} = (p::Parser{T}) -> _parser(ModWithDefault(p, 
 # entry point
 function argparse(pp::Parser{T,S,p}, args::Vector{String})::Result{T,String} where {T,S,p}
 
-    ctx = Context(args, pp.initialState)
+    ctx = Context{S}(args, pp.initialState, false)
 
     while true
-        mayberesult::ParseResult{S,String} = parse(unwrapunion(pp), ctx)
+        mayberesult::ParseResult{S,String} = @unionsplit parse(pp, ctx)
         #=
         There is currently an issue. We need a mechanism to allow bypassing this check
         To allow for potential "fixable" errors (think optional) to pass through to the
@@ -187,7 +187,7 @@ function argparse(pp::Parser{T,S,p}, args::Vector{String})::Result{T,String} whe
         length(ctx.buffer) > 0 || break
     end
 
-    return endResult = complete(unwrapunion(pp), ctx.state)
+    return endResult = @unionsplit complete(pp, ctx.state)
 end
 
 macro comment(_...) end
