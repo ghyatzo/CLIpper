@@ -46,12 +46,12 @@ using UUIDs: UUID, uuid_version
 #	OK optional()
 #	OK withDefault()
 #	- multiple(min, max) (match multiple times, collect into an array.)
-#	- map() # probably impossible to make typstable until we don't have ValuedFunctions
+#	NOTPLANNED map() # probably impossible to make typstable until we don't have ValuedFunctions
 #	-
 
 # construct combinators: combine different parsers into new ones
 # 	OK object(), combines multiple named parsers into a single parser that produces a single object. Does not preserve order.
-#	- tuple(), combines parsers to produce tuple of results. preserves order of the final result, but not necessarily the parsing order.
+#	TEST tuple(), combines parsers to produce tuple of results. preserves order of the final result, but not necessarily the parsing order.
 #	OK or(), mutually exclusive alternatives
 #	- merge(), takes two parsers and generate a new single parser combining both
 #	- concat(), appends tuple parsers
@@ -84,12 +84,13 @@ export argparse,
     # constructors
     object,
     or,
+    tup,
 
     # modifier
     optional,
     withDefault
 
-
+include("utils.jl")
 include("parser.jl")
 include("valueparsers/valueparsers.jl")
 include("primitives/primitives.jl")
@@ -104,6 +105,7 @@ include("modifiers/modifiers.jl")
         ArgArgument{T, S, p, P},
         ConstrObject{T, S, p, P},
         ConstrOr{T, S, p, P},
+        ConstrTuple{T, S, p, P},
         ModOptional{T, S, p, P},
         ModWithDefault{T, S, p, P},
         ArgCommand{T, S, p, P},
@@ -118,6 +120,7 @@ _parser(x::ArgCommand{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 
 _parser(x::ConstrObject{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 _parser(x::ConstrOr{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
+_parser(x::ConstrTuple{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 
 _parser(x::ModOptional{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 _parser(x::ModWithDefault{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
@@ -153,6 +156,8 @@ object(objlabel, obj::NamedTuple) = _parser(_object(obj; label = objlabel))
 
 
 or(parsers...) = _parser(ConstrOr(parsers))
+
+tup(parsers...; kw...) = _parser(ConstrTuple(parsers; kw...))
 
 # modifiers
 optional(p::Parser) = _parser(ModOptional(p))
