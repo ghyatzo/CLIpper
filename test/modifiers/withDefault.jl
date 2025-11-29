@@ -142,7 +142,7 @@ end
 
 @testset "should work with constant parsers" begin
     baseParser = @constant(:hello)
-    defaultParser = withDefault(baseParser, :default)
+    defaultParser = withDefault(baseParser, Val(:hello))
 
     buffer = String[]
     state = defaultParser.initialState
@@ -155,7 +155,7 @@ end
         completeResult = splitcomplete(defaultParser, next_state)
         @test !is_error(completeResult)
         if !is_error(completeResult)
-            @test unwrap(completeResult) == :hello
+            @test unwrap(completeResult) == Val(:hello)
         end
     end
 end
@@ -164,7 +164,7 @@ end
     stringParser = withDefault(option("-s", str()), "default-string")
     numberParser = withDefault(option("-n", integer()), 42)
     booleanParser = withDefault(flag("-b"), true)
-    arrayParser = withDefault(@constant((1, 2, 3)), (3, 2, 1))
+    arrayParser = withDefault(@constant((1, 2, 3)), Val((1, 2, 3)))
 
     # Test string default
     stringResult = splitcomplete(stringParser, none(tstate(stringParser.parser)))
@@ -192,7 +192,7 @@ end
     arrayResult = splitcomplete(arrayParser, some(Val((1, 2, 3))))
     @test !is_error(arrayResult)
     if !is_error(arrayResult)
-        @test unwrap(arrayResult) == (1, 2, 3)
+        @test unwrap(arrayResult) == Val((1, 2, 3))
     end
 end
 

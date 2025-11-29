@@ -125,7 +125,7 @@ end
     @test !is_error(comp)
     succ = unwrap(comp)
 
-    @test succ.cst == 10
+    @test succ.cst == Val(10)
     @test succ.option == "me"
     @test succ.flag == true
     @test succ.flag2 == true

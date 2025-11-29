@@ -253,7 +253,7 @@ end
     @test !is_error(res)
 
     val = unwrap(res)
-    @test val == [:fixed]
+    @test val == [Val(:fixed)]
 end
 
 @testset "should reproduce example usage patterns" begin

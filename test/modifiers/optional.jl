@@ -132,7 +132,7 @@ end
 
     completeResult = splitcomplete(optionalParser, ps.next.state)
     @test !is_error(completeResult)
-    @test unwrap(completeResult) == :hello
+    @test unwrap(completeResult) == Val(:hello)
 end
 
 @testset "should handle options terminator" begin
