@@ -15,6 +15,7 @@ end
 # define it here for ease of use
 splitparse(p::Parser, ctx::Context) = @unionsplit parse(p, ctx)
 splitcomplete(p::Parser, st) = @unionsplit complete(p, st)
+val(::Val{x}) where {x} = x
 
 @testset "Primitives" begin
 

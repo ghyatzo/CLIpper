@@ -26,7 +26,7 @@ end
     result = @unionsplit complete(parser, Val(69))
 
     @test is_ok_and(result) do succ
-        @test succ == 69
+        @test val(succ) == 69
         !is_error(result)
     end
 end
@@ -36,10 +36,10 @@ end
     boolconst = @constant(true)
     namedtupleconst = @constant((key = :value,))
 
-    @test (@? complete(unwrapunion(stringconst), Val(:hello))) == :hello
-    @test (@? complete(unwrapunion(intconst), Val(123))) == 123
-    @test (@? complete(unwrapunion(boolconst), Val(true))) == true
-    @test (@? complete(unwrapunion(namedtupleconst), Val((key = :value,)))) == (key = :value,)
+    @test val(@? complete(unwrapunion(stringconst), Val(:hello))) == :hello
+    @test val(@? complete(unwrapunion(intconst), Val(123))) == 123
+    @test val(@? complete(unwrapunion(boolconst), Val(true))) == true
+    @test val(@? complete(unwrapunion(namedtupleconst), Val((key = :value,)))) == (key = :value,)
 end
 
 @testset "should be type stable" begin

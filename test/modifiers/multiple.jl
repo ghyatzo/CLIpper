@@ -11,7 +11,6 @@ end
     multipleParser = multiple(baseParser)
 
     res = argparse(multipleParser, ["-l", "en", "-l", "fr", "-l", "de"])
-    @info res
     @test !is_error(res)
 
     val = unwrap(res)
@@ -246,7 +245,7 @@ end
     @test !is_error(res)
 
     val = unwrap(res)
-    @test val == [:fixed]
+    @test val == [Val(:fixed)]
 end
 
 @testset "should reproduce example usage patterns" begin

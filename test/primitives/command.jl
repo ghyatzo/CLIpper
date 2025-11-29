@@ -36,7 +36,7 @@ end
 
     # Value lives in next.state (Ok(...)); unwrap to get the parsed object
     val = unwrap(res)
-    @test getproperty(val, :type) == :show
+    @test getproperty(val, :type) == Val(:show)
     @test getproperty(val, :progress) == true
     @test getproperty(val, :id) == "item123"
 end
@@ -91,7 +91,7 @@ end
     res1 = argparse(editParser, ["edit", "-e", "vim", "item123"])
     @test !is_error(res1)
     val1 = unwrap(res1)
-    @test getproperty(val1, :type) == :edit
+    @test getproperty(val1, :type) == Val(:edit)
     @test getproperty(val1, :editor) == "vim"
     @test getproperty(val1, :id) == "item123"
 
@@ -99,7 +99,7 @@ end
     res2 = argparse(editParser, ["edit", "item456"])
     @test !is_error(res2)
     val2 = unwrap(res2)
-    @test getproperty(val2, :type) == :edit
+    @test getproperty(val2, :type) == Val(:edit)
     @test getproperty(val2, :editor) === nothing
     @test getproperty(val2, :id) == "item456"
 end
@@ -132,7 +132,7 @@ end
     showRes = argparse(parser, ["show", "--progress", "item123"])
     @test !is_error(showRes)
     showVal = unwrap(showRes)
-    @test getproperty(showVal, :type) == :show
+    @test getproperty(showVal, :type) == Val(:show)
     @test getproperty(showVal, :progress) == true
     @test getproperty(showVal, :id) == "item123"
 
@@ -140,7 +140,7 @@ end
     editRes = argparse(parser, ["edit", "-e", "vim", "item456"])
     @test !is_error(editRes)
     editVal = unwrap(editRes)
-    @test getproperty(editVal, :type) == :edit
+    @test getproperty(editVal, :type) == Val(:edit)
     @test getproperty(editVal, :editor) == "vim"
     @test getproperty(editVal, :id) == "item456"
 end
@@ -222,12 +222,12 @@ end
     @test !is_error(editRes)
 
     showVal = unwrap(showRes)
-    @test getproperty(showVal, :type) == :show
+    @test getproperty(showVal, :type) == Val(:show)
     @test getproperty(showVal, :progress) == true
     @test getproperty(showVal, :id) == "item123"
 
     editVal = unwrap(editRes)
-    @test getproperty(editVal, :type) == :edit
+    @test getproperty(editVal, :type) == Val(:edit)
     @test getproperty(editVal, :editor) == "vim"
     @test getproperty(editVal, :id) == "item456"
 end
@@ -284,13 +284,13 @@ end
     res1 = argparse(parser, ["test", "item123"])
     @test !is_error(res1)
     val1 = unwrap(res1)
-    @test getproperty(val1, :type) == :test
+    @test getproperty(val1, :type) == Val(:test)
 
     # Should match "testing" exactly
     res2 = argparse(parser, ["testing", "item456"])
     @test !is_error(res2)
     val2 = unwrap(res2)
-    @test getproperty(val2, :type) == :testing
+    @test getproperty(val2, :type) == Val(:testing)
 end
 
 @testset "should handle commands that look like options" begin
@@ -306,7 +306,7 @@ end
     res = argparse(parser, ["--help"])
     @test !is_error(res)
     val = unwrap(res)
-    @test getproperty(val, :type) == :help
+    @test getproperty(val, :type) == Val(:help)
 end
 
 # @testset "should handle command with array-like TState (state type safety test)" begin
@@ -346,7 +346,7 @@ end
     @test getproperty(val, :globalFlag) == true
 
     cmd = getproperty(val, :cmd)
-    @test getproperty(cmd, :type) == :run
+    @test getproperty(cmd, :type) == Val(:run)
     @test getproperty(cmd, :script) == "build"
 end
 
@@ -388,12 +388,12 @@ end
     res1 = argparse(parser, ["v1"])
     @test !is_error(res1)
     val1 = unwrap(res1)
-    @test val1 == :version1
+    @test val1 == Val(:version1)
 
     res2 = argparse(parser, ["v2"])
     @test !is_error(res2)
     val2 = unwrap(res2)
-    @test val2 == :version2
+    @test val2 == Val(:version2)
 end
 
 @testset "should handle empty command name gracefully" begin
@@ -402,5 +402,5 @@ end
     res = argparse(parser, [""])
     @test !is_error(res)
     val = unwrap(res)
-    @test val == :empty
+    @test val == Val(:empty)
 end
