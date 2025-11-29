@@ -49,6 +49,10 @@ end
         include("constructors/or.jl")
     end
 
+    @testset "Tup" begin
+        include("constructors/tup.jl")
+    end
+
 end
 
 @testset "Modifiers" begin

@@ -51,7 +51,7 @@ using UUIDs: UUID, uuid_version
 
 # construct combinators: combine different parsers into new ones
 # 	OK object(), combines multiple named parsers into a single parser that produces a single object. Does not preserve order.
-#	TEST tuple(), combines parsers to produce tuple of results. preserves order of the final result, but not necessarily the parsing order.
+#	OK tuple(), combines parsers to produce tuple of results. preserves order of the final result, but not necessarily the parsing order.
 #	OK or(), mutually exclusive alternatives
 #	- merge(), takes two parsers and generate a new single parser combining both
 #	- concat(), appends tuple parsers
@@ -158,6 +158,7 @@ object(objlabel, obj::NamedTuple) = _parser(_object(obj; label = objlabel))
 or(parsers...) = _parser(ConstrOr(parsers))
 
 tup(parsers...; kw...) = _parser(ConstrTuple(parsers; kw...))
+tup(label::String, parsers...; kw...) = _parser(ConstrTuple(parsers; label, kw...))
 
 # modifiers
 optional(p::Parser) = _parser(ModOptional(p))

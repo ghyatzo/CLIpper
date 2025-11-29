@@ -52,6 +52,7 @@ function parse(p::ConstrTuple{T, S}, ctx::Context{S})::ParseResult{S, String} wh
         # less efficient computationally but at least type stable
         =#
         i = 0
+        # TODO: switch to a generated function to unroll based on the length of the tuple without random ass magic numbers
         @unroll 10 for parser in sorted_ptup
         	i += 1
             #= we need to simulate a i in matched_parsers && continue but in an unrolled loop
@@ -81,7 +82,7 @@ function parse(p::ConstrTuple{T, S}, ctx::Context{S})::ParseResult{S, String} wh
                     push!(matched_parsers, i)
                     found_match = true
                     #= take the first (highest priority) match that consumes input =#
-                    @goto endloop_consumers #= it simulates a "break" but using
+                    @goto endloop_consumers #= it simulates a "break" by using @goto.
                     # tecnically the @unroll macro also already uses a "loopend" label, but It seems that
                     # these goto macros are expanded before the @unroll and therefore is not there yet. =#
                 elseif is_error(result) && error[1] <= unwrap_error(result).consumed
