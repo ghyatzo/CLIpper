@@ -65,6 +65,10 @@ end
         include("modifiers/withDefault.jl")
     end
 
+    @testset "Multiple Modifier" begin
+        include("modifiers/multiple.jl")
+    end
+
 end
 
 

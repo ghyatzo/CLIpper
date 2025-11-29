@@ -45,7 +45,7 @@ using UUIDs: UUID, uuid_version
 # modifying combinators: Transform existing Parsers adding additional behaviour on top of the core one
 #	OK optional()
 #	OK withDefault()
-#	- multiple(min, max) (match multiple times, collect into an array.)
+#	TEST multiple(min, max) (match multiple times, collect into an array.)
 #	NOTPLANNED map() # probably impossible to make typstable until we don't have ValuedFunctions
 #	-
 
@@ -88,7 +88,8 @@ export argparse,
 
     # modifier
     optional,
-    withDefault
+    withDefault,
+    multiple
 
 include("utils.jl")
 include("parser.jl")
@@ -103,12 +104,13 @@ include("modifiers/modifiers.jl")
         ArgOption{T, S, p, P},
         ArgConstant{T, S, p, P},
         ArgArgument{T, S, p, P},
+        ArgCommand{T, S, p, P},
         ConstrObject{T, S, p, P},
         ConstrOr{T, S, p, P},
         ConstrTuple{T, S, p, P},
         ModOptional{T, S, p, P},
         ModWithDefault{T, S, p, P},
-        ArgCommand{T, S, p, P},
+        ModMultiple{T, S, p, P}
     }
 end
 
@@ -124,6 +126,7 @@ _parser(x::ConstrTuple{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 
 _parser(x::ModOptional{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 _parser(x::ModWithDefault{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
+_parser(x::ModMultiple{T, S, p, P}) where {T, S, p, P} = Parser{T, S, p, P}(x)
 
 Base.getproperty(p::Parser, f::Symbol) = @unionsplit Base.getproperty(p, f)
 Base.hasproperty(p::Parser, f::Symbol) = @unionsplit Base.hasproperty(p, f)
@@ -135,8 +138,12 @@ Base.hasproperty(p::Parser, f::Symbol) = @unionsplit Base.hasproperty(p, f)
 # primitives
 option(names::Tuple{Vararg{String}}, valparser::ValueParser{T}; kw...) where {T} =
     _parser(ArgOption(Tuple(names), valparser; kw...))
-option(names::String, valparser::ValueParser{T}; kw...) where {T} =
-    _parser(ArgOption((names,), valparser; kw...))
+option(opt1::String, valparser::ValueParser{T}; kw...) where {T} =
+    _parser(ArgOption((opt1,), valparser; kw...))
+option(opt1::String, opt2::String, valparser::ValueParser{T}; kw...) where {T} =
+    _parser(ArgOption((opt1, opt2), valparser; kw...))
+option(opt1::String, opt2::String, opt3::String, valparser::ValueParser{T}; kw...) where {T} =
+    _parser(ArgOption((opt1, opt2, opt3), valparser; kw...))
 
 
 flag(names...; kw...) = _parser(ArgFlag(names; kw...))
@@ -167,6 +174,8 @@ optional(p::Parser) = _parser(ModOptional(p))
 withDefault(p::Parser{T}, default::T) where {T} = _parser(ModWithDefault(p, default))
 
 withDefault(default::T) where {T} = (p::Parser{T}) -> _parser(ModWithDefault(p, default))
+
+multiple(p::Parser; kw...) = _parser(ModMultiple(p; kw...))
 
 #####
 # entry point
