@@ -77,7 +77,7 @@ end
 
                 if is_error(result)
                     parse_err = unwrap_error(result)
-                    if error.consumed <= parse_err.consumed
+                    if error.consumed < parse_err.consumed
                         error = parse_err
                     end
                 else
@@ -103,8 +103,9 @@ end
     end
 
     return ex = quote
-        error = ParseFailure(0, "Expected argument, option or command, but got end of input.")
-
+        #= if nothing inside the object can match our token, then it's "unexpected" =#
+        token = ctx.buffer[1]
+        error = ParseFailure(0, "Unexpected option or argument: `$(token)`")
         #= greedy parsing trying to consume as many field as possible =#
         anysuccess = false
         allconsumed::Tuple{Vararg{String}} = ()
@@ -117,9 +118,9 @@ end
         @label startwhile
         while (madeprogress && length(current_ctx.buffer) > 0) && iter < maxiter
             madeprogress = false
+            iter += 1
 
             $whilebody
-            iter += 1
         end
 
         return current_ctx, error, allconsumed, anysuccess
