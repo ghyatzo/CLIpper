@@ -71,6 +71,13 @@ end
 
 end
 
+@testset "Integration Tests" begin
+
+    @testset "Argparse" begin
+        include("argparse.jl")
+    end
+end
+
 
 #=
 
