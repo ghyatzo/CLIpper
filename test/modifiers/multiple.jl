@@ -18,10 +18,12 @@ end
 end
 
 @testset "should return empty array when no matches found in object context" begin
-    parser = object((
-        locales = multiple(option(("-l", "--locale"), str())),
-        verbose = flag("-v", "--verbose"),
-    ))
+    parser = object(
+        (
+            locales = multiple(option(("-l", "--locale"), str())),
+            verbose = flag("-v", "--verbose"),
+        )
+    )
 
     res = argparse(parser, ["-v"])
     @test !is_error(res)
@@ -92,10 +94,12 @@ end
 end
 
 @testset "should work with default options (min=0, max=Infinity)" begin
-    parser = object((
-        options = multiple(option("-x", str())),
-        help = flag("-h", "--help"),
-    ))
+    parser = object(
+        (
+            options = multiple(option("-x", str())),
+            help = flag("-h", "--help"),
+        )
+    )
 
     # When min=0, should allow empty array in object context
     resEmpty = argparse(parser, ["-h"])
@@ -121,11 +125,13 @@ end
 end
 
 @testset "should work in object combinations" begin
-    parser = object((
-        locales = multiple(option(("-l", "--locale"), str())),
-        verbose = flag("-v", "--verbose"),
-        files = multiple(argument(str()); min = 1),
-    ))
+    parser = object(
+        (
+            locales = multiple(option(("-l", "--locale"), str())),
+            verbose = flag("-v", "--verbose"),
+            files = multiple(argument(str()); min = 1),
+        )
+    )
 
     res = argparse(parser, ["-l", "en", "-l", "fr", "-v", "file1.txt", "file2.txt"])
     @test !is_error(res)
@@ -146,10 +152,12 @@ end
 end
 
 @testset "should handle mixed successful and failed parsing attempts in object context" begin
-    parser = object((
-        numbers = multiple(option("-n", "--number", integer())),
-        other   = option("--other", str()),
-    ))
+    parser = object(
+        (
+            numbers = multiple(option("-n", "--number", integer())),
+            other = option("--other", str()),
+        )
+    )
 
     res = argparse(parser, ["-n", "42", "-n", "100", "--other", "value"])
     @test !is_error(res)
@@ -250,11 +258,13 @@ end
 
 @testset "should reproduce example usage patterns" begin
     # Example 1
-    parser1 = object((
-        name    = option("-n", "--name", str()),
-        locales = multiple(option(("-l", "--locale"), str())),
-        id      = argument(str()),
-    ))
+    parser1 = object(
+        (
+            name = option("-n", "--name", str()),
+            locales = multiple(option(("-l", "--locale"), str())),
+            id = argument(str()),
+        )
+    )
     res1 = argparse(parser1, ["-n", "John", "-l", "en-US", "-l", "fr-FR", "user123"])
     @test !is_error(res1)
     val1 = unwrap(res1)
@@ -263,10 +273,12 @@ end
     @test getproperty(val1, :id) == "user123"
 
     # Example 2: constrained multiple arguments
-    parser2 = object((
-        title = option("-t", "--title", str()),
-        ids   = multiple(argument(str()); min = 1, max = 3),
-    ))
+    parser2 = object(
+        (
+            title = option("-t", "--title", str()),
+            ids = multiple(argument(str()); min = 1, max = 3),
+        )
+    )
     res2 = argparse(parser2, ["-t", "My Title", "id1", "id2"])
     @test !is_error(res2)
     val2 = unwrap(res2)
@@ -280,10 +292,12 @@ end
 end
 
 @testset "should handle options terminator correctly" begin
-    parser = object((
-        locales = multiple(option(("-l", "--locale"), str())),
-        args    = multiple(argument(str())),
-    ))
+    parser = object(
+        (
+            locales = multiple(option(("-l", "--locale"), str())),
+            args = multiple(argument(str())),
+        )
+    )
 
     res = argparse(parser, ["-l", "en", "--", "-l", "fr"])
     @test !is_error(res)
@@ -329,13 +343,13 @@ end
     invalidRes = argparse(multipleParser, ["-p", "8080", "-p", "100"])
     @test is_error(invalidRes)  # Should fail due to port 100 being below minimum
 
-    tooManyRes = argparse(multipleParser, ["-p","8080","-p","9000","-p","3000","-p","4000","-p","5000","-p","6000"])
+    tooManyRes = argparse(multipleParser, ["-p", "8080", "-p", "9000", "-p", "3000", "-p", "4000", "-p", "5000", "-p", "6000"])
     @test is_error(tooManyRes)
     @test occursin("Expected at most 5 values, but got 6", string(unwrap_error(tooManyRes)))
 end
 
 @testset "should maintain type safety with different value types" begin
-    stringMultiple  = multiple(option("-s", str()))
+    stringMultiple = multiple(option("-s", str()))
     integerMultiple = multiple(option("-i", integer()))
     booleanMultiple = multiple(flag("-b"))
 
@@ -358,7 +372,7 @@ end
     # Booleans
     booleanRes = argparse(booleanMultiple, ["-bb"])
     @test !is_error(booleanRes)
-    bVals =  unwrap(booleanRes)
+    bVals = unwrap(booleanRes)
     @test length(bVals) == 2
     @test bVals[1] isa Bool
     @test bVals == [true, true]

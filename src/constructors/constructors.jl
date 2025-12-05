@@ -1,3 +1,5 @@
 include("object.jl")
 include("or.jl")
 include("tuple.jl")
+include("merge.jl")
+include("concat.jl")

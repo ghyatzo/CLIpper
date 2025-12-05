@@ -36,10 +36,10 @@ using UUIDs:
 
 # primitive parsers: building blocks of command line interfaces
 #	OK constant()
-#	OK option()
+#	OK option() # Add support for -Lval style options
 #	OK flag()
 #   OK argument()
-#	OK command()
+#	OK command() # add command aliases to commands "status" "st"
 #   ? PassThrough()
 #	- parsers priority: command > argument > option > flag > constant
 
@@ -75,18 +75,25 @@ using UUIDs:
 #	OK optional()
 #	OK withDefault()
 #	OK multiple(min, max) (match multiple times, collect into an array.)
-#	NOTPLANNED map() # probably impossible to make typstable until we don't have ValuedFunctions
+#	X map() # probably impossible to make typstable until we have something like TypedCallables
 #	-
 
 # construct combinators: combine different parsers into new ones
 # 	OK object(), combines multiple named parsers into a single parser that produces a single object. Does not preserve order.
 #	OK tuple(), combines parsers to produce tuple of results. preserves order of the final result, but not necessarily the parsing order.
 #	OK or(), mutually exclusive alternatives
-#	- merge(), takes two parsers and generate a new single parser combining both
-#	- concat(), appends tuple parsers
+#   OK(TEST?) merge(), takes two parsers and generate a new single parser combining both
+#	OK(TEST?) concat(), appends tuple parsers
 #	- longest-match(), tries all parses and selects the one with the longest match.
 #	- group(), documentation only combinator, adds a group label to parsers inside.
 #   ? conditional(), check 0.7.1
+
+
+# - Usage Mechanism
+# - Automatic Help and pretty printing.
+# - Suggestions Mechanism
+# - Better Errors
+# - Shell completions
 
 export argparse,
     # primitives
@@ -145,7 +152,7 @@ include("modifiers/modifiers.jl")
 
         ModOptional{T, S, p, P},
         ModWithDefault{T, S, p, P},
-        ModMultiple{T, S, p, P}
+        ModMultiple{T, S, p, P},
     }
 end
 
@@ -196,25 +203,26 @@ end
 
 argument(valparser::ValueParser{T}; kw...) where {T} = _parser(ArgArgument(valparser; kw...))
 
-command(name::String, p::Parser; kw...) = _parser(ArgCommand(name, p))
+command(name::String, p::Parser; kw...) = _parser(ArgCommand(name, p; kw...))
 
 
 # constructors
 object(obj::NamedTuple) = _parser(_object(obj))
 object(objlabel, obj::NamedTuple) = _parser(_object(obj; label = objlabel))
 
+objmerge(objs...; label = "") = _parser(_object(_merge(objs); label))
+
 or(parsers...) = _parser(ConstrOr(parsers))
 
 tup(parsers...; kw...) = _parser(ConstrTuple(parsers; kw...))
 tup(label::String, parsers...; kw...) = _parser(ConstrTuple(parsers; label, kw...))
 
-
-
+concat(tups...; label = "", allowDuplicates = false) = _parser(ConstrTuple(_concat(tups); label, allowDuplicates))
 
 
 #####
 # entry point
-function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} where {T, S, p}
+function argparse(pp::Parser{T, S}, args::Vector{String})::Result{T, String} where {T, S}
 
     ctx = Context{S}(args, pp.initialState, false)
 
@@ -241,59 +249,9 @@ function argparse(pp::Parser{T, S, p}, args::Vector{String})::Result{T, String} 
         length(ctx.buffer) > 0 || break
     end
 
-    return endResult = @unionsplit complete(pp, ctx.state)
+    return @unionsplit complete(pp, ctx.state)
 end
 
 macro comment(_...) end
-
-@comment begin
-    using CLIpper
-    args = ["--host", "me", "--verbose", "--test"]
-
-    opt = option(["--host"], str(; metavar = "HOST"))
-    flg = flag(["--verbose"])
-    flg2 = flag(["--test"])
-
-    cst = constant(10)
-
-    obj = object(
-        "test", (
-            # cst = cst,
-            option = opt,
-            flag = flg,
-            flag2 = flg2,
-        )
-    )
-
-    opt_opt = optional(opt)
-    def_flg = withDefault(flg, false)
-
-    obj2 = object(
-        "test mod", (
-            option = opt_opt,
-            flag = def_flg,
-        )
-    )
-
-    arg = argument(str(; metavar = "TEST"))
-
-
-    using JET
-    @report_opt argparse(opt, ["--host", "me"])
-    @report_opt argparse(flg, ["--verbose"])
-    @report_opt argparse(obj, args)
-
-    @report_opt argparse(opt_opt, String[])
-    @report_opt argparse(def_flg, String[])
-
-    @report_opt argparse(obj2, String[])
-
-    @btime CLIpper._sort_obj(nt) setup = begin
-        opt = option(["--host"], stringval(; metavar = "HOST"))
-        flg = flag(["--verbose"])
-
-        nt = (option = opt, flag = flg)
-    end
-end
 
 end # module CLIpper
