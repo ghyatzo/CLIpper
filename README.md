@@ -1,4 +1,265 @@
 # CLIpper
+
+A Type Stable Composable CLI Parser for Julia, heavily inspired (basically a port) by [optparse-applicative](https://github.com/pcapriotti/optparse-applicative) and [Optique](https://optique.dev/) (typescript version).
+
+[![Build Status](https://github.com/ghyatzo/CLIpper/workflows/CI/badge.svg)](https://github.com/ghyatzo/CLIpper/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+> ⚠️ **Work In Progress**: CLIpper is in active development. The API is experimental and subject to change.
+> Type stability is tested and promising, but needs more real-world validation.
+
+## Philosophy
+
+In CLIpper, everything is a parser. Complex parsers are built from simpler ones through composition.
+Following the principle of "parse, don't validate," CLIpper returns exactly what you ask for—or fails with a clear explanation.
+
+Each parser is a tree of subparsers. Leaf nodes do the actual parsing, intermediate nodes compose and orchestrate parsers to
+create new behaviours. Parsing is done in two passes:
+
+- in the first, the input is checked against each branch of the tree until a match is found. Each node updates its state
+to reflect if it succeded or not. This is the `parse` step.
+- if the input match any of the branches we consider the step successful, otherwise we return the error of why it failed to match.
+- the second pass is the `complete` step. The tree is collapsed, eventual validation error handled and a final object returned.
+
+## Quick Start
+
+```julia
+using CLIpper
+
+# Define a parser
+parser = object((
+    name = option("-n", "--name", str()),
+    port = option("-p", "--port", integer(min=1000)),
+    verbose = optflag("-v", "--verbose")
+))
+
+# Parse arguments
+result = argparse(parser, ["--name", "myserver", "-p", "8080", "-v"])
+
+@assert result.name == "myserver"
+@assert result.port == 8080
+@assert result.verbose == true
+```
+
+## Core Concepts
+
+CLIpper provides four types of building blocks:
+
+### Primitives
+
+The fundamental parsers that match command-line tokens:
+
+- **`option`** - Matches key-value pairs: `--port 8080` or `-p 8080`
+- **`flag`** - Boolean switches: `--verbose` or `-v`
+- **`argument`** - Positional arguments: `source destination`
+- **`command`** - Subcommands: `git add file.txt`
+
+```julia
+# Options with different styles
+port = option("-p", "--port", integer())
+result = argparse(port, ["--port=8080"])  # Long form with =
+result = argparse(port, ["-p", "8080"])   # Short form
+
+# Flags can be bundled
+parser = object((
+    all = flag("-a"),
+    long = flag("-l"),
+    human = flag("-h")
+))
+result = argparse(parser, ["-alh"])  # Equivalent to ["-a", "-l", "-h"]
+```
+
+### Value Parsers
+
+Type-safe parsers that convert strings to values:
+
+- **`str()`** - String values with optional pattern validation
+- **`integer()`** / **`i8()`**, **`u32()`**, etc. - Integer types with min/max bounds
+- **`flt()`** / **`flt32()`**, **`flt64()`** - Floating point numbers
+- **`choice()`** - Enumerated values
+- **`uuid()`** - UUID validation
+
+```julia
+# Type-safe parsing with constraints
+port = option("-p", integer(min=1000, max=65535))
+level = option("-l", choice("debug", "info", "warn", "error"))
+config = option("-c", str(pattern=r".*\.toml$"))
+```
+
+### Modifiers
+
+Enhance parsers with additional behavior:
+
+- **`optional`** - Makes a parser optional (returns `nothing` if absent)
+- **`withDefault`** - Provides a fallback value
+- **`multiple`** - Allows repeated matches, returns a vector
+
+```julia
+# Optional values
+email = optional(option("-e", "--email", str()))
+
+# With defaults
+port = withDefault(option("-p", integer()), 8080)
+
+# Multiple values
+packages = multiple(argument(str()))  # pkg add Package1 Package2 Package3
+
+# Verbosity levels
+verbosity = multiple(flag("-v"))  # -v -v -v or -vvv
+```
+
+### Constructors
+
+Compose parsers into complex structures:
+
+- **`object`** - Named tuple of parsers (most common)
+- **`or`** - Mutually exclusive alternatives (for subcommands)
+- **`tup`** - Ordered tuple (preserves parser order)
+- **`objmerge`** / **`concat`** - Merge multiple parser groups
+
+```julia
+# Object composition
+parser = object((
+    input = argument(str(metavar="INPUT")),
+    output = option("-o", "--output", str()),
+    force = optflag("-f", "--force")
+))
+
+# Alternative commands with or
+addCmd = command("add", object((
+    action = @constant(:add),
+    packages = multiple(argument(str()))
+)))
+
+removeCmd = command("remove", object((
+    action = @constant(:remove),
+    packages = multiple(argument(str()))
+)))
+
+pkgParser = or(addCmd, removeCmd)
+```
+
+## Complete Example
+
+Here's a more realistic example showing subcommands:
+
+```julia
+using CLIpper
+
+# Shared options
+commonOpts = object((
+    verbose = optflag("-v", "--verbose"),
+    quiet = optflag("-q", "--quiet")
+))
+
+# Add command
+addCmd = command("add", objmerge(
+    commonOpts,
+    object((packages = multiple(argument(str(metavar="PACKAGE"))),))
+))
+
+# Remove command
+removeCmd = command("remove", "rm", objmerge(
+    commonOpts,
+    object((
+        all = optflag("--all"),
+        packages = multiple(argument(str(metavar="PACKAGE")))
+    ))
+))
+
+# Instantiate command
+instantiateCmd = command("instantiate", objmerge(
+    commonOpts,
+    object((
+        manifest = optflag("-m", "--manifest"),
+        project = optflag("-p", "--project")
+    ))
+))
+
+# Complete parser
+parser = or(addCmd, removeCmd, instantiateCmd)
+
+# Usage examples:
+# julia pkg.jl add DataFrames Plots -v
+# julia pkg.jl remove --all -q
+# julia pkg.jl instantiate --manifest
+```
+
+## Type Stability
+
+CLIpper is designed for type stability. The return type of your parser is fully determined at compile time:
+
+```julia
+parser = object((
+    name = option("-n", str()),
+    port = option("-p", integer())
+))
+
+# Return type: @NamedTuple{name::String, port::Int64)}
+
+parser = or(
+    object((mode = @constant(:a), value = integer())),
+    object((mode = @constant(:b), value = str()))
+)
+
+# Return type: Union{@NamedTuple{mode::Val{:a}, ...}, NamedTuple{mode::Val{:b}, ...}}
+```
+
+## Error Handling
+
+When parsing fails, CLIpper provides clear error messages indicating what went wrong:
+
+```julia
+parser = option("-p", integer(min=1000))
+
+# Invalid value
+argparse(parser, ["-p", "abc"])  # Error: Expected integer
+
+# Out of range
+argparse(parser, ["-p", "500"])  # Error: Value must be >= 1000
+
+# Missing required option
+argparse(parser, [])  # Error: Required option -p not found
+```
+
+## Comparison with Alternatives
+
+For more detailed documentation and design philosophy, see [Optique's excellent documentation](https://optique.dev/),
+which heavily influenced CLIpper's design.
+
+## Installation
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/ghyatzo/CLIpper")
+```
+
+## Documentation
+
+Comprehensive documentation is available through Julia's help system:
+
+```juliarepl
+julia> using CLIpper
+
+julia> ?option
+julia> ?object
+julia> ?or
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+CLIpper's design is heavily inspired by:
+- [Optique](https://optique.dev/) - Typescript CLI parsing library
+- [optparse-applicative](https://github.com/pcapriotti/optparse-applicative) - Haskell command-line parser
+<!-- # CLIpper
 A Type Stable Composable CLI Parser (heavily) inspired by [Optique](https://optique.dev/) and [optparse-applicative](https://github.com/pcapriotti/optparse-applicative).
 
 This is currently in a heavily experimental and work in progress phase. The tests are thorough, but
@@ -46,6 +307,7 @@ result = argparse(parser, ["--name", "server", "--port", "8080"])
 
 @assert result.name == "server"
 @assert result.port == 8080
+
 ```
 
 ---
@@ -233,3 +495,4 @@ Probably the superhero of all parsers here. Deals with mutually exclusive subtre
 ## License
 
 MIT License. See LICENSE for details.
+ -->
