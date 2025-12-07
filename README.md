@@ -37,7 +37,7 @@ ensure type stability with arbitrary functions.
 ## Quick Start
 
 ```julia
-using CLIpper
+using CLIopt
 
 # Define a parser
 parser = object((

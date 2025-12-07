@@ -95,6 +95,7 @@ using UUIDs:
 # - Better Errors
 # - Shell completions
 
+
 export argparse,
     # primitives
     @constant,
@@ -125,6 +126,8 @@ export argparse,
     object,
     or,
     tup,
+    objmerge,
+    concat,
 
     # modifier
     optional,
