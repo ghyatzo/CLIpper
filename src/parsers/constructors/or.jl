@@ -1,5 +1,10 @@
 const OrState{I, X} = Tuple{I, X} # X should be a Tuple of Option{ParseSuccess{SP1}} and I a Val{int position}
 
+# we might need to wrap the result of the or inside a wrapped structure so that we can tell the compiler it's really just those two elements
+@wrapped struct Or{U}
+    union::U
+end
+
 # a parser that returns the first parsers that matches, in the order provided!
 struct ConstrOr{T, S, p, P} <: AbstractParser{T, S, p, P}
     initialState::S
@@ -16,7 +21,7 @@ ConstrOr(parsers::PTup) where {PTup <: Tuple} = let
         Val{i - 1}
     end
     ConstrOr{
-        Union{map(tval, parsers)...},
+        Or{Union{map(tval, parsers)...}},
         OrState{Union{possible_vals...}, typeof(inner_state)},
         mapreduce(p -> priority(p), max, parsers),
         typeof(parsers),
@@ -96,11 +101,11 @@ parse(p::ConstrOr{T, OrState{I, S}}, ctx::Context{OrState{I, S}}) where {T, I, S
     convert(ParseResult{OrState{valunion, state_t}, String}, _generated_or_parse(p.parsers, ctx, ctx.state[1]))
 end
 
-function complete(p::ConstrOr{T}, orstate::OrState{Val{i}, S})::Result{T, String} where {i, T, S}
+function complete(p::ConstrOr{Or{U}}, orstate::OrState{Val{i}, S})::Result{Or{U}, String} where {i, U, S}
     i == 0 && return Err("No matching option or command.")
     _, allmaybestates = orstate
 
     result = @unionsplit complete(p.parsers[i], unwrap(allmaybestates[i]).next.state)
 
-    return Ok(@? result)
+    return Ok(@? Or{U}(result))
 end
